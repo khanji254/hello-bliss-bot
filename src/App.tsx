@@ -4,6 +4,13 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
+// Contexts
+import { AuthProvider } from "./contexts/AuthContext";
+import { ThemeProvider } from "./contexts/ThemeProvider";
+
+// Components
+import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+
 // Pages
 import Landing from "./pages/Landing";
 import AuthPage from "./pages/auth/AuthPage";
@@ -12,16 +19,27 @@ import TeacherDashboard from "./pages/teacher/TeacherDashboard";
 import Marketplace from "./pages/marketplace/Marketplace";
 import CircuitSimulator from "./pages/simulations/CircuitSimulator";
 import ROSPlayground from "./pages/simulations/ROSPlayground";
+import StudentCourses from "./pages/student/StudentCourses";
+import StudentProgress from "./pages/student/StudentProgress";
+import StudentProfile from "./pages/student/StudentProfile";
+import TeacherStudents from "./pages/teacher/TeacherStudents";
+import TeacherCourses from "./pages/teacher/TeacherCourses";
+import TeacherAnalytics from "./pages/teacher/TeacherAnalytics";
+import TeacherEarnings from "./pages/teacher/TeacherEarnings";
+import CreateCourse from "./pages/teacher/CreateCourse";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
+    <ThemeProvider defaultTheme="light" storageKey="robotics-app-theme">
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Landing />} />
@@ -29,16 +47,16 @@ const App = () => (
           
           {/* Student Routes */}
           <Route path="/student" element={<StudentDashboard />} />
-          <Route path="/student/courses" element={<div>Student Courses</div>} />
-          <Route path="/student/progress" element={<div>Student Progress</div>} />
+          <Route path="/student/courses" element={<StudentCourses />} />
+          <Route path="/student/progress" element={<StudentProgress />} />
           
           {/* Teacher Routes */}
           <Route path="/teacher" element={<TeacherDashboard />} />
-          <Route path="/teacher/courses" element={<div>Teacher Courses</div>} />
-          <Route path="/teacher/create" element={<div>Create Course</div>} />
-          <Route path="/teacher/analytics" element={<div>Teacher Analytics</div>} />
-          <Route path="/teacher/earnings" element={<div>Earnings</div>} />
-          <Route path="/teacher/students" element={<div>Manage Students</div>} />
+          <Route path="/teacher/courses" element={<TeacherCourses />} />
+          <Route path="/teacher/create" element={<CreateCourse />} />
+          <Route path="/teacher/analytics" element={<TeacherAnalytics />} />
+          <Route path="/teacher/earnings" element={<TeacherEarnings />} />
+          <Route path="/teacher/students" element={<TeacherStudents />} />
           
           {/* Shared Routes */}
           <Route path="/marketplace" element={<Marketplace />} />
@@ -51,8 +69,8 @@ const App = () => (
           <Route path="/simulations/programming" element={<div>Robot Programming</div>} />
           
           {/* Profile & Settings */}
-          <Route path="/profile" element={<div>User Profile</div>} />
-          <Route path="/settings" element={<div>Settings</div>} />
+          <Route path="/profile" element={<StudentProfile />} />
+          <Route path="/settings" element={<Settings />} />
           
           {/* Admin Routes */}
           <Route path="/admin" element={<div>Admin Dashboard</div>} />
@@ -65,7 +83,9 @@ const App = () => (
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
-  </QueryClientProvider>
+  </AuthProvider>
+</ThemeProvider>
+</QueryClientProvider>
 );
 
 export default App;

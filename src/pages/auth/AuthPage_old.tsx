@@ -5,13 +5,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Bot, Loader2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Bot, User, GraduationCap, Shield, Loader2 } from "lucide-react";
 import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { UserRole } from "@/types/user";
 
 export default function AuthPage() {
   const { user, login, register, isLoading } = useAuth();
+  const [userType, setUserType] = useState<UserRole>("student");
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [registerData, setRegisterData] = useState({ 
     name: "", 
@@ -52,7 +54,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-secondary/5 to-accent/10 circuit-pattern p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center space-x-2 text-2xl font-bold">
@@ -81,9 +83,9 @@ export default function AuthPage() {
               <CardContent className="space-y-4">
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="signin-email">Email</Label>
+                    <Label htmlFor="email">Email</Label>
                     <Input 
-                      id="signin-email" 
+                      id="email" 
                       type="email" 
                       placeholder="student@example.com"
                       value={loginData.email}
@@ -92,9 +94,9 @@ export default function AuthPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signin-password">Password</Label>
+                    <Label htmlFor="password">Password</Label>
                     <Input 
-                      id="signin-password" 
+                      id="password" 
                       type="password" 
                       placeholder="Enter your password"
                       value={loginData.password}
@@ -120,6 +122,18 @@ export default function AuthPage() {
                   <p>Admin: admin@example.com</p>
                   <p>Password: any text</p>
                 </div>
+                  <Input id="password" type="password" />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="remember" />
+                  <Label htmlFor="remember" className="text-sm">Remember me</Label>
+                </div>
+                <Button className="w-full">Sign In</Button>
+                <div className="text-center">
+                  <Link to="/auth/forgot" className="text-sm text-primary hover:underline">
+                    Forgot your password?
+                  </Link>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -133,72 +147,86 @@ export default function AuthPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <form onSubmit={handleRegister} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-name">Full Name</Label>
-                    <Input 
-                      id="signup-name" 
-                      type="text" 
-                      placeholder="John Doe"
-                      value={registerData.name}
-                      onChange={(e) => setRegisterData({ ...registerData, name: e.target.value })}
-                      required
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
-                    <Input 
-                      id="signup-email" 
-                      type="email" 
-                      placeholder="john@example.com"
-                      value={registerData.email}
-                      onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
-                      required
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
-                    <Input 
-                      id="signup-password" 
-                      type="password" 
-                      placeholder="Create a password"
-                      value={registerData.password}
-                      onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-role">I am a:</Label>
-                    <Select 
-                      value={registerData.role} 
-                      onValueChange={(value: UserRole) => setRegisterData({ ...registerData, role: value })}
+                {/* User Type Selection */}
+                <div className="space-y-3">
+                  <Label>I am a:</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button 
+                      variant={userType === "student" ? "default" : "outline"}
+                      className="h-auto p-4 flex-col space-y-2"
+                      onClick={() => setUserType("student")}
                     >
+                      <GraduationCap className="h-6 w-6" />
+                      <span>Student</span>
+                    </Button>
+                    <Button 
+                      variant={userType === "teacher" ? "default" : "outline"}
+                      className="h-auto p-4 flex-col space-y-2"
+                      onClick={() => setUserType("teacher")}
+                    >
+                      <User className="h-6 w-6" />
+                      <span>Teacher</span>
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">First Name</Label>
+                    <Input id="firstName" placeholder="John" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                    <Input id="lastName" placeholder="Doe" />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input id="email" type="email" placeholder="your@email.com" />
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input id="password" type="password" />
+                </div>
+
+                {userType === "teacher" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="specialization">Specialization</Label>
+                    <Select>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select your role" />
+                        <SelectValue placeholder="Choose your expertise" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="student">Student</SelectItem>
-                        <SelectItem value="teacher">Teacher</SelectItem>
+                        <SelectItem value="circuits">Electronics & Circuits</SelectItem>
+                        <SelectItem value="programming">Robot Programming</SelectItem>
+                        <SelectItem value="ros">ROS Development</SelectItem>
+                        <SelectItem value="mechanics">Mechanical Design</SelectItem>
+                        <SelectItem value="ai">AI & Machine Learning</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  
-                  {error && (
-                    <p className="text-sm text-destructive">{error}</p>
-                  )}
-                  
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Create Account
-                  </Button>
-                </form>
+                )}
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox id="terms" />
+                  <Label htmlFor="terms" className="text-sm">
+                    I agree to the <Link to="/terms" className="text-primary hover:underline">Terms of Service</Link>
+                  </Label>
+                </div>
+                
+                <Button className="w-full">
+                  Create Account
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
+
+        <div className="mt-6 text-center text-sm text-muted-foreground">
+          <p>By signing up, you agree to our Terms of Service and Privacy Policy</p>
+        </div>
       </div>
     </div>
   );
