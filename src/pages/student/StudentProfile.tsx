@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Layout } from "@/components/layout/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockCourses, mockStudent } from "@/lib/mockData";
+import { useStudentCourses, useStudentDashboard } from "@/hooks/useStudentData";
+import { authApi } from "@/lib/api";
 import { 
   User, 
   Mail, 
@@ -30,30 +31,38 @@ import {
   Edit3,
   Camera,
   Save,
-  X
+  X,
+  Loader2
 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function StudentProfile() {
   const { user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState("profile");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   
-  // Mock user profile data
+  // Fetch real student data
+  const { data: dashboardData, isLoading: dashboardLoading } = useStudentDashboard();
+  const { courses: studentCourses, isLoading: coursesLoading } = useStudentCourses();
+  
+  // Real profile data from backend
   const [profileData, setProfileData] = useState({
-    firstName: "Alex",
-    lastName: "Chen",
-    email: "alex.chen@email.com",
-    phone: "+1 (555) 123-4567",
-    location: "San Francisco, CA",
-    dateOfBirth: "1998-03-15",
-    institution: "UC Berkeley",
-    major: "Computer Science",
-    yearOfStudy: "Junior",
-    bio: "Passionate about robotics and AI. Currently exploring autonomous systems and machine learning applications in robotics.",
-    interests: ["Robotics", "AI/ML", "Circuit Design", "Programming", "3D Printing"],
-    learningGoals: "Master ROS development and build autonomous robots",
-    githubProfile: "https://github.com/alexchen",
-    linkedinProfile: "https://linkedin.com/in/alexchen"
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    location: "",
+    dateOfBirth: "",
+    institution: "",
+    major: "",
+    yearOfStudy: "",
+    bio: "",
+    interests: [] as string[],
+    learningGoals: "",
+    githubProfile: "",
+    linkedinProfile: ""
   });
 
   const [preferences, setPreferences] = useState({
@@ -67,96 +76,217 @@ export default function StudentProfile() {
     showAchievements: true
   });
 
-  if (!user) return null;
+  const [currentUser, setCurrentUser] = useState(user);
 
-  // Get user stats
-  const enrolledCourses = mockCourses.filter(course => 
-    mockStudent.enrolledCourses.includes(course.id)
-  );
-  const completedCourses = mockCourses.filter(course => 
-    mockStudent.completedCourses.includes(course.id)
-  );
+  useEffect(() => {
+    if (user) {
+      setCurrentUser(user);
+    }
+  }, [user]);
 
-  const handleSave = () => {
-    setIsEditing(false);
-    // Here you would typically save to a backend
-    console.log("Profile updated:", profileData);
+  useEffect(() => {
+    fetchProfileData();
+  }, []);
+
+  const fetchProfileData = async () => {
+    try {
+      setIsLoading(true);
+      const data = await authApi.getProfile();
+      
+      setCurrentUser(prev => ({
+        ...prev,
+        ...data,
+        avatar: data.avatar
+      }));
+      
+      setProfileData({
+        firstName: data.first_name || "",
+        lastName: data.last_name || "",
+        email: data.email || "",
+        phone: data.phone || "",
+        location: data.location || "",
+        dateOfBirth: data.date_of_birth || "",
+        institution: data.institution || "",
+        major: data.major || "",
+        yearOfStudy: data.year_of_study || "",
+        bio: data.bio || "",
+        interests: Array.isArray(data.interests) ? data.interests : [],
+        learningGoals: data.learning_goals || "",
+        githubProfile: data.github_profile || "",
+        linkedinProfile: data.linkedin_profile || ""
+      });
+
+      setPreferences({
+        emailNotifications: data.email_notifications ?? true,
+        pushNotifications: data.push_notifications ?? false,
+        weeklyProgress: data.weekly_progress ?? true,
+        courseUpdates: data.course_updates ?? true,
+        marketing: data.marketing ?? false,
+        publicProfile: data.public_profile ?? false,
+        showProgress: data.show_progress ?? true,
+        showAchievements: data.show_achievements ?? true
+      });
+    } catch (error: any) {
+      console.error("Profile fetch error:", error);
+      toast.error("Failed to load profile data");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      
+      const updateData = {
+        first_name: profileData.firstName.trim(),
+        last_name: profileData.lastName.trim(),
+        phone: profileData.phone.trim(),
+        location: profileData.location.trim(),
+        date_of_birth: profileData.dateOfBirth ? profileData.dateOfBirth : null,
+        institution: profileData.institution.trim(),
+        major: profileData.major.trim(),
+        year_of_study: profileData.yearOfStudy,
+        bio: profileData.bio.trim(),
+        interests: Array.isArray(profileData.interests) ? profileData.interests.filter(i => i.trim()) : [],
+        learning_goals: profileData.learningGoals.trim(),
+        github_profile: profileData.githubProfile.trim(),
+        linkedin_profile: profileData.linkedinProfile.trim(),
+        email_notifications: preferences.emailNotifications,
+        push_notifications: preferences.pushNotifications,
+        weekly_progress: preferences.weeklyProgress,
+        course_updates: preferences.courseUpdates,
+        marketing: preferences.marketing,
+        public_profile: preferences.publicProfile,
+        show_progress: preferences.showProgress,
+        show_achievements: preferences.showAchievements
+      };
+
+      const result = await authApi.updateProfile(updateData);
+      toast.success("Profile updated successfully!");
+      setIsEditing(false);
+      await fetchProfileData();
+    } catch (error: any) {
+      console.error("Profile update error:", error);
+      if (error.response?.data) {
+        const errorData = error.response.data;
+        if (typeof errorData === 'object') {
+          const errorMessages = Object.entries(errorData)
+            .map(([field, messages]) => `${field}: ${Array.isArray(messages) ? messages.join(', ') : messages}`)
+            .join('; ');
+          toast.error(`Validation errors: ${errorMessages}`);
+        } else {
+          toast.error(`Failed to update profile: ${errorData}`);
+        }
+      } else {
+        toast.error("Failed to update profile. Please try again.");
+      }
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCancel = () => {
     setIsEditing(false);
-    // Reset any changes
+    fetchProfileData();
   };
 
-  const handleImageUpload = (event) => {
-    const file = event.target.files[0];
+  const displayHelpers = useMemo(() => {
+    const getDisplayName = () => {
+      if (profileData.firstName && profileData.lastName) {
+        return `${profileData.firstName} ${profileData.lastName}`;
+      }
+      return currentUser?.name || "Student";
+    };
+
+    const getInitials = () => {
+      const name = getDisplayName();
+      return name
+        .split(' ')
+        .map(n => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
+    };
+
+    const getAvatarUrl = () => {
+      if (currentUser?.avatar) {
+        return currentUser.avatar;
+      }
+      return authApi.generateAvatarUrl(getDisplayName());
+    };
+
+    return { getDisplayName, getInitials, getAvatarUrl };
+  }, [profileData.firstName, profileData.lastName, currentUser?.name, currentUser?.avatar]);
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (file) {
-      // Handle image upload
-      console.log("Uploading image:", file.name);
+      try {
+        const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (!allowedTypes.includes(file.type)) {
+          toast.error("Please select a valid image file (JPEG, PNG, GIF, or WebP)");
+          return;
+        }
+
+        const maxSize = 5 * 1024 * 1024;
+        if (file.size > maxSize) {
+          toast.error("File size must be less than 5MB");
+          return;
+        }
+
+        const formData = new FormData();
+        formData.append('avatar', file);
+        
+        toast.loading("Uploading avatar...");
+        await authApi.uploadAvatar(formData);
+        toast.dismiss();
+        toast.success("Avatar updated successfully!");
+        
+        await fetchProfileData();
+        event.target.value = '';
+      } catch (error: any) {
+        console.error("Avatar upload error:", error);
+        toast.dismiss();
+        toast.error("Failed to upload avatar: " + (error.message || "Unknown error"));
+      }
     }
   };
 
-  const ProfileField = ({ label, value, name, type = "text", options = null }) => {
-    if (!isEditing) {
-      return (
-        <div className="space-y-1">
-          <Label className="text-sm font-medium">{label}</Label>
-          <p className="text-sm text-muted-foreground">{value || "Not provided"}</p>
-        </div>
-      );
-    }
+  // SIMPLE handlers - NO complications
+  const handleFieldChange = (field: string, value: string) => {
+    setProfileData(prev => ({ ...prev, [field]: value }));
+  };
 
-    if (type === "select" && options) {
-      return (
-        <div className="space-y-2">
-          <Label htmlFor={name}>{label}</Label>
-          <Select value={value} onValueChange={(newValue) => 
-            setProfileData(prev => ({ ...prev, [name]: newValue }))
-          }>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {options.map(option => (
-                <SelectItem key={option} value={option}>{option}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      );
-    }
+  if (!currentUser) return null;
 
-    if (type === "textarea") {
-      return (
-        <div className="space-y-2">
-          <Label htmlFor={name}>{label}</Label>
-          <Textarea
-            id={name}
-            value={value}
-            onChange={(e) => setProfileData(prev => ({ ...prev, [name]: e.target.value }))}
-            rows={3}
-          />
-        </div>
-      );
-    }
-
+  if (isLoading) {
     return (
-      <div className="space-y-2">
-        <Label htmlFor={name}>{label}</Label>
-        <Input
-          id={name}
-          type={type}
-          value={value}
-          onChange={(e) => setProfileData(prev => ({ ...prev, [name]: e.target.value }))}
-        />
-      </div>
+      <Layout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+            <p className="text-muted-foreground">Loading profile...</p>
+          </div>
+        </div>
+      </Layout>
     );
-  };
+  }
+
+  const enrolledCourses = studentCourses?.filter(sc => 
+    sc.status === 'enrolled' || sc.status === 'in_progress'
+  ) || [];
+  const completedCourses = studentCourses?.filter(sc => 
+    sc.status === 'completed'
+  ) || [];
+
+  const totalPoints = dashboardData?.progress?.totalPoints || 0;
+  const totalBadges = dashboardData?.progress?.badges || 0;
+  const studyTimeHours = dashboardData?.progress?.studyTime ? Math.round(dashboardData.progress.studyTime / 60) : 0;
 
   return (
     <Layout>
       <div className="space-y-8">
-        {/* Header */}
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-3xl font-bold">Profile</h1>
@@ -171,28 +301,34 @@ export default function StudentProfile() {
             </Button>
           ) : (
             <div className="flex gap-2">
-              <Button variant="outline" onClick={handleCancel}>
+              <Button variant="outline" onClick={handleCancel} disabled={isSaving}>
                 <X className="mr-2 h-4 w-4" />
                 Cancel
               </Button>
-              <Button onClick={handleSave}>
-                <Save className="mr-2 h-4 w-4" />
+              <Button onClick={handleSave} disabled={isSaving}>
+                {isSaving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
                 Save Changes
               </Button>
             </div>
           )}
         </div>
 
-        {/* Profile Overview Card */}
         <Card>
           <CardContent className="p-6">
             <div className="flex items-start gap-6">
-              {/* Profile Picture */}
               <div className="relative">
                 <Avatar className="h-24 w-24">
-                  <AvatarImage src="/placeholder-avatar.jpg" alt="Profile" />
+                  <AvatarImage 
+                    src={displayHelpers.getAvatarUrl()} 
+                    alt="Profile"
+                    key={currentUser?.avatar || 'default'}
+                  />
                   <AvatarFallback className="text-lg">
-                    {profileData.firstName[0]}{profileData.lastName[0]}
+                    {displayHelpers.getInitials()}
                   </AvatarFallback>
                 </Avatar>
                 {isEditing && (
@@ -208,32 +344,38 @@ export default function StudentProfile() {
                 )}
               </div>
 
-              {/* Profile Info */}
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
                   <h2 className="text-2xl font-bold">
-                    {profileData.firstName} {profileData.lastName}
+                    {displayHelpers.getDisplayName()}
                   </h2>
-                  <Badge variant="secondary">{user?.role || "Student"}</Badge>
+                  <Badge variant="secondary">{currentUser?.role || "Student"}</Badge>
                 </div>
-                <p className="text-muted-foreground mb-4">{profileData.bio}</p>
+                <p className="text-muted-foreground mb-4">{profileData.bio || "No bio provided yet"}</p>
                 
-                {/* Quick Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-primary">{enrolledCourses.length}</div>
+                    <div className="text-2xl font-bold text-primary">
+                      {coursesLoading ? <Loader2 className="h-6 w-6 animate-spin mx-auto" /> : enrolledCourses.length}
+                    </div>
                     <div className="text-sm text-muted-foreground">Active Courses</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-green-500">{completedCourses.length}</div>
+                    <div className="text-2xl font-bold text-green-500">
+                      {coursesLoading ? <Loader2 className="h-6 w-6 animate-spin mx-auto" /> : completedCourses.length}
+                    </div>
                     <div className="text-sm text-muted-foreground">Completed</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-yellow-500">12</div>
+                    <div className="text-2xl font-bold text-yellow-500">
+                      {dashboardLoading ? <Loader2 className="h-6 w-6 animate-spin mx-auto" /> : totalBadges}
+                    </div>
                     <div className="text-sm text-muted-foreground">Achievements</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold text-orange-500">156h</div>
+                    <div className="text-2xl font-bold text-orange-500">
+                      {dashboardLoading ? <Loader2 className="h-6 w-6 animate-spin mx-auto" /> : `${studyTimeHours}h`}
+                    </div>
                     <div className="text-sm text-muted-foreground">Study Time</div>
                   </div>
                 </div>
@@ -242,7 +384,6 @@ export default function StudentProfile() {
           </CardContent>
         </Card>
 
-        {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="profile">
@@ -271,57 +412,110 @@ export default function StudentProfile() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <ProfileField
-                    label="First Name"
-                    value={profileData.firstName}
-                    name="firstName"
-                  />
-                  <ProfileField
-                    label="Last Name"
-                    value={profileData.lastName}
-                    name="lastName"
-                  />
-                  <ProfileField
-                    label="Email"
-                    value={profileData.email}
-                    name="email"
-                    type="email"
-                  />
-                  <ProfileField
-                    label="Phone"
-                    value={profileData.phone}
-                    name="phone"
-                    type="tel"
-                  />
-                  <ProfileField
-                    label="Location"
-                    value={profileData.location}
-                    name="location"
-                  />
-                  <ProfileField
-                    label="Date of Birth"
-                    value={profileData.dateOfBirth}
-                    name="dateOfBirth"
-                    type="date"
-                  />
+                  <div className="space-y-2">
+                    <Label>First Name</Label>
+                    {isEditing ? (
+                      <Input
+                        value={profileData.firstName}
+                        onChange={(e) => handleFieldChange('firstName', e.target.value)}
+                        placeholder="Enter first name"
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">{profileData.firstName || "Not provided"}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Last Name</Label>
+                    {isEditing ? (
+                      <Input
+                        value={profileData.lastName}
+                        onChange={(e) => handleFieldChange('lastName', e.target.value)}
+                        placeholder="Enter last name"
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">{profileData.lastName || "Not provided"}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <p className="text-sm text-muted-foreground">{profileData.email || "Not provided"}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Phone</Label>
+                    {isEditing ? (
+                      <Input
+                        type="tel"
+                        value={profileData.phone}
+                        onChange={(e) => handleFieldChange('phone', e.target.value)}
+                        placeholder="Enter phone number"
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">{profileData.phone || "Not provided"}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Location</Label>
+                    {isEditing ? (
+                      <Input
+                        value={profileData.location}
+                        onChange={(e) => handleFieldChange('location', e.target.value)}
+                        placeholder="Enter location"
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">{profileData.location || "Not provided"}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Date of Birth</Label>
+                    {isEditing ? (
+                      <Input
+                        type="date"
+                        value={profileData.dateOfBirth}
+                        onChange={(e) => handleFieldChange('dateOfBirth', e.target.value)}
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">{profileData.dateOfBirth || "Not provided"}</p>
+                    )}
+                  </div>
                 </div>
                 
                 <Separator />
                 
-                <ProfileField
-                  label="Bio"
-                  value={profileData.bio}
-                  name="bio"
-                  type="textarea"
-                />
+                <div className="space-y-2">
+                  <Label>Bio</Label>
+                  {isEditing ? (
+                    <Textarea
+                      value={profileData.bio}
+                      onChange={(e) => handleFieldChange('bio', e.target.value)}
+                      rows={3}
+                      placeholder="Enter bio"
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{profileData.bio || "Not provided"}</p>
+                  )}
+                </div>
                 
                 <div className="space-y-2">
                   <Label>Interests</Label>
                   <div className="flex flex-wrap gap-2">
-                    {profileData.interests.map((interest, index) => (
-                      <Badge key={index} variant="secondary">{interest}</Badge>
-                    ))}
+                    {profileData.interests.length > 0 ? (
+                      profileData.interests.map((interest, index) => (
+                        <Badge key={index} variant="secondary">{interest}</Badge>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No interests added yet</p>
+                    )}
                   </div>
+                  {isEditing && (
+                    <Input
+                      placeholder="Add interests (comma-separated)"
+                      value={profileData.interests.join(', ')}
+                      onChange={(e) => {
+                        const interests = e.target.value.split(',').map(i => i.trim()).filter(i => i);
+                        setProfileData(prev => ({ ...prev, interests }));
+                      }}
+                    />
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -332,18 +526,32 @@ export default function StudentProfile() {
                 <CardDescription>Connect your professional profiles</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <ProfileField
-                  label="GitHub Profile"
-                  value={profileData.githubProfile}
-                  name="githubProfile"
-                  type="url"
-                />
-                <ProfileField
-                  label="LinkedIn Profile"
-                  value={profileData.linkedinProfile}
-                  name="linkedinProfile"
-                  type="url"
-                />
+                <div className="space-y-2">
+                  <Label>GitHub Profile</Label>
+                  {isEditing ? (
+                    <Input
+                      type="url"
+                      value={profileData.githubProfile}
+                      onChange={(e) => handleFieldChange('githubProfile', e.target.value)}
+                      placeholder="Enter GitHub profile URL"
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{profileData.githubProfile || "Not provided"}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>LinkedIn Profile</Label>
+                  {isEditing ? (
+                    <Input
+                      type="url"
+                      value={profileData.linkedinProfile}
+                      onChange={(e) => handleFieldChange('linkedinProfile', e.target.value)}
+                      placeholder="Enter LinkedIn profile URL"
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{profileData.linkedinProfile || "Not provided"}</p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -356,63 +564,66 @@ export default function StudentProfile() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <ProfileField
-                    label="Institution"
-                    value={profileData.institution}
-                    name="institution"
-                  />
-                  <ProfileField
-                    label="Major/Field of Study"
-                    value={profileData.major}
-                    name="major"
-                  />
-                  <ProfileField
-                    label="Year of Study"
-                    value={profileData.yearOfStudy}
-                    name="yearOfStudy"
-                    type="select"
-                    options={["Freshman", "Sophomore", "Junior", "Senior", "Graduate", "PhD"]}
-                  />
+                  <div className="space-y-2">
+                    <Label>Institution</Label>
+                    {isEditing ? (
+                      <Input
+                        value={profileData.institution}
+                        onChange={(e) => handleFieldChange('institution', e.target.value)}
+                        placeholder="Enter institution"
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">{profileData.institution || "Not provided"}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Major/Field of Study</Label>
+                    {isEditing ? (
+                      <Input
+                        value={profileData.major}
+                        onChange={(e) => handleFieldChange('major', e.target.value)}
+                        placeholder="Enter major"
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground">{profileData.major || "Not provided"}</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Year of Study</Label>
+                    {isEditing ? (
+                      <Select value={profileData.yearOfStudy} onValueChange={(value) => handleFieldChange('yearOfStudy', value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select year of study" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="freshman">Freshman</SelectItem>
+                          <SelectItem value="sophomore">Sophomore</SelectItem>
+                          <SelectItem value="junior">Junior</SelectItem>
+                          <SelectItem value="senior">Senior</SelectItem>
+                          <SelectItem value="graduate">Graduate</SelectItem>
+                          <SelectItem value="phd">PhD</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">{profileData.yearOfStudy || "Not provided"}</p>
+                    )}
+                  </div>
                 </div>
                 
                 <Separator />
                 
-                <ProfileField
-                  label="Learning Goals"
-                  value={profileData.learningGoals}
-                  name="learningGoals"
-                  type="textarea"
-                />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Learning Statistics</CardTitle>
-                <CardDescription>Your progress and achievements</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                  <div className="text-center p-4 border rounded-lg">
-                    <BookOpen className="h-8 w-8 text-blue-500 mx-auto mb-2" />
-                    <div className="text-2xl font-bold">{enrolledCourses.length}</div>
-                    <div className="text-sm text-muted-foreground">Enrolled Courses</div>
-                  </div>
-                  <div className="text-center p-4 border rounded-lg">
-                    <Trophy className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
-                    <div className="text-2xl font-bold">{completedCourses.length}</div>
-                    <div className="text-sm text-muted-foreground">Completed Courses</div>
-                  </div>
-                  <div className="text-center p-4 border rounded-lg">
-                    <Clock className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                    <div className="text-2xl font-bold">156h</div>
-                    <div className="text-sm text-muted-foreground">Total Study Time</div>
-                  </div>
-                  <div className="text-center p-4 border rounded-lg">
-                    <Calendar className="h-8 w-8 text-purple-500 mx-auto mb-2" />
-                    <div className="text-2xl font-bold">23</div>
-                    <div className="text-sm text-muted-foreground">Study Streak</div>
-                  </div>
+                <div className="space-y-2">
+                  <Label>Learning Goals</Label>
+                  {isEditing ? (
+                    <Textarea
+                      value={profileData.learningGoals}
+                      onChange={(e) => handleFieldChange('learningGoals', e.target.value)}
+                      rows={3}
+                      placeholder="Enter learning goals"
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{profileData.learningGoals || "Not provided"}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>

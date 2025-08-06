@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockCourses, mockStudent } from "@/lib/mockData";
+import { useStudentCourses, useStudentDashboard } from "@/hooks/useStudentData";
 import { 
   BookOpen, 
   Clock, 
@@ -20,7 +20,8 @@ import {
   AlertCircle,
   BarChart3,
   PieChart,
-  Activity
+  Activity,
+  Loader2
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -29,26 +30,21 @@ export default function StudentProgress() {
   const [timeRange, setTimeRange] = useState("week");
   const [activeTab, setActiveTab] = useState("overview");
   
+  // Fetch real data
+  const { data: dashboardData, isLoading: dashboardLoading } = useStudentDashboard();
+  const { courses: studentCourses, isLoading: coursesLoading } = useStudentCourses();
+  
   if (!user) return null;
 
-  // Get enrolled courses
-  const enrolledCourses = mockCourses.filter(course => 
-    mockStudent.enrolledCourses.includes(course.id)
+  // Filter courses by status
+  const enrolledCourses = studentCourses.filter(sc => 
+    sc.status === 'enrolled' || sc.status === 'in_progress'
+  );
+  const completedCourses = studentCourses.filter(sc => 
+    sc.status === 'completed'
   );
 
-  // Get completed courses
-  const completedCourses = mockCourses.filter(course => 
-    mockStudent.completedCourses.includes(course.id)
-  );
-
-  // Mock progress data
-  const courseProgress = {
-    'course_1': 85,
-    'course_2': 45,
-    'course_3': 100
-  };
-
-  // Mock activity data
+  // Mock activity data (would come from activities API)
   const weeklyActivity = [
     { day: "Mon", hours: 2.5, completed: 3 },
     { day: "Tue", hours: 1.8, completed: 2 },
@@ -59,26 +55,20 @@ export default function StudentProgress() {
     { day: "Sun", hours: 2.8, completed: 3 }
   ];
 
-  // Mock achievements
-  const achievements = [
+  // Use real badges data
+  const achievements = dashboardData?.badges?.map(badge => ({
+    id: badge.id,
+    title: badge.name,
+    description: badge.description,
+    icon: badge.icon,
+    earned: true,
+    date: badge.earnedAt.toISOString().split('T')[0]
+  })) || [];
+
+  // Add some mock future achievements
+  const mockFutureAchievements = [
     {
-      id: 1,
-      title: "First Steps",
-      description: "Complete your first course module",
-      icon: "🎯",
-      earned: true,
-      date: "2024-01-15"
-    },
-    {
-      id: 2,
-      title: "Speed Learner",
-      description: "Complete 5 modules in one day",
-      icon: "⚡",
-      earned: true,
-      date: "2024-01-20"
-    },
-    {
-      id: 3,
+      id: 'circuit_master',
       title: "Circuit Master",
       description: "Complete all circuit simulation courses",
       icon: "🔌",
@@ -86,7 +76,7 @@ export default function StudentProgress() {
       progress: 60
     },
     {
-      id: 4,
+      id: 'consistent_learner',
       title: "Consistent Learner",
       description: "Study for 7 consecutive days",
       icon: "📅",
@@ -95,36 +85,41 @@ export default function StudentProgress() {
     }
   ];
 
-  // Calculate overall stats
+  const allAchievements = [...achievements, ...mockFutureAchievements];
+
+  // Calculate overall stats from real data
   const totalHours = weeklyActivity.reduce((sum, day) => sum + day.hours, 0);
   const totalCompleted = weeklyActivity.reduce((sum, day) => sum + day.completed, 0);
   const avgProgress = enrolledCourses.length > 0 ? 
-    enrolledCourses.reduce((sum, course) => sum + (courseProgress[course.id] || 0), 0) / enrolledCourses.length : 0;
+    enrolledCourses.reduce((sum, sc) => sum + sc.progressPercentage, 0) / enrolledCourses.length : 0;
 
-  const ProgressCard = ({ course, progress }) => (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <CardTitle className="text-base line-clamp-1">{course.title}</CardTitle>
-            <CardDescription className="text-sm">{course.instructor}</CardDescription>
+  const ProgressCard = ({ studentCourse }) => {
+    const { course, progressPercentage } = studentCourse;
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <CardTitle className="text-base line-clamp-1">{course.title}</CardTitle>
+              <CardDescription className="text-sm">{course.teacherName}</CardDescription>
+            </div>
+            <Badge variant={progressPercentage === 100 ? "default" : "secondary"}>
+              {progressPercentage === 100 ? "Complete" : `${Math.round(progressPercentage)}%`}
+            </Badge>
           </div>
-          <Badge variant={progress === 100 ? "default" : "secondary"}>
-            {progress === 100 ? "Complete" : `${progress}%`}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <Progress value={progress} className="h-2" />
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">{course.modules.length} modules</span>
-          <Button variant="ghost" size="sm" asChild>
-            <Link to={`/courses/${course.id}`}>Continue</Link>
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Progress value={progressPercentage} className="h-2" />
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">{course.modules?.length || 0} modules</span>
+            <Button variant="ghost" size="sm" asChild>
+              <Link to={`/courses/${course.id}`}>Continue</Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   const ActivityChart = () => (
     <Card>
@@ -184,6 +179,15 @@ export default function StudentProgress() {
     </Card>
   );
 
+  const LoadingSpinner = () => (
+    <div className="flex items-center justify-center py-12">
+      <div className="text-center space-y-4">
+        <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+        <p className="text-muted-foreground">Loading progress data...</p>
+      </div>
+    </div>
+  );
+
   return (
     <Layout>
       <div className="space-y-8">
@@ -215,7 +219,13 @@ export default function StudentProgress() {
               <div className="flex items-center gap-3">
                 <Clock className="h-8 w-8 text-blue-500" />
                 <div>
-                  <p className="text-2xl font-bold">{totalHours.toFixed(1)}h</p>
+                  <p className="text-2xl font-bold">
+                    {dashboardLoading ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : (
+                      `${Math.round((dashboardData?.progress?.studyTime || 0) / 60)}h`
+                    )}
+                  </p>
                   <p className="text-sm text-muted-foreground">Study Time</p>
                 </div>
               </div>
@@ -227,8 +237,14 @@ export default function StudentProgress() {
               <div className="flex items-center gap-3">
                 <Target className="h-8 w-8 text-green-500" />
                 <div>
-                  <p className="text-2xl font-bold">{totalCompleted}</p>
-                  <p className="text-sm text-muted-foreground">Modules Completed</p>
+                  <p className="text-2xl font-bold">
+                    {coursesLoading ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : (
+                      studentCourses.reduce((total, sc) => total + (sc.course.modules?.length || 0), 0)
+                    )}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Total Modules</p>
                 </div>
               </div>
             </CardContent>
@@ -239,7 +255,13 @@ export default function StudentProgress() {
               <div className="flex items-center gap-3">
                 <TrendingUp className="h-8 w-8 text-orange-500" />
                 <div>
-                  <p className="text-2xl font-bold">{avgProgress.toFixed(0)}%</p>
+                  <p className="text-2xl font-bold">
+                    {coursesLoading ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : (
+                      `${Math.round(avgProgress)}%`
+                    )}
+                  </p>
                   <p className="text-sm text-muted-foreground">Avg Progress</p>
                 </div>
               </div>
@@ -251,7 +273,13 @@ export default function StudentProgress() {
               <div className="flex items-center gap-3">
                 <Trophy className="h-8 w-8 text-yellow-500" />
                 <div>
-                  <p className="text-2xl font-bold">{achievements.filter(a => a.earned).length}</p>
+                  <p className="text-2xl font-bold">
+                    {dashboardLoading ? (
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    ) : (
+                      achievements.length
+                    )}
+                  </p>
                   <p className="text-sm text-muted-foreground">Achievements</p>
                 </div>
               </div>
@@ -280,18 +308,24 @@ export default function StudentProgress() {
                   <CardDescription>Your active learning progress</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {enrolledCourses.slice(0, 3).map((course) => (
-                    <div key={course.id} className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="font-medium line-clamp-1">{course.title}</span>
-                        <span>{courseProgress[course.id] || 0}%</span>
-                      </div>
-                      <Progress value={courseProgress[course.id] || 0} className="h-2" />
-                    </div>
-                  ))}
-                  <Button variant="outline" className="w-full" asChild>
-                    <Link to="/student/courses">View All Courses</Link>
-                  </Button>
+                  {coursesLoading ? (
+                    <LoadingSpinner />
+                  ) : (
+                    <>
+                      {enrolledCourses.slice(0, 3).map((studentCourse) => (
+                        <div key={studentCourse.id} className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="font-medium line-clamp-1">{studentCourse.course.title}</span>
+                            <span>{Math.round(studentCourse.progressPercentage)}%</span>
+                          </div>
+                          <Progress value={studentCourse.progressPercentage} className="h-2" />
+                        </div>
+                      ))}
+                      <Button variant="outline" className="w-full" asChild>
+                        <Link to="/student/courses">View All Courses</Link>
+                      </Button>
+                    </>
+                  )}
                 </CardContent>
               </Card>
 
@@ -305,21 +339,27 @@ export default function StudentProgress() {
                   <CardDescription>Your latest accomplishments</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {achievements.filter(a => a.earned).slice(0, 3).map((achievement) => (
-                    <div key={achievement.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
-                      <div className="text-lg">{achievement.icon}</div>
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">{achievement.title}</p>
-                        <p className="text-xs text-muted-foreground">{achievement.description}</p>
-                      </div>
-                      <Badge variant="secondary" className="text-xs">
-                        {new Date(achievement.date).toLocaleDateString()}
-                      </Badge>
-                    </div>
-                  ))}
-                  <Button variant="outline" className="w-full" onClick={() => setActiveTab("achievements")}>
-                    View All Achievements
-                  </Button>
+                  {dashboardLoading ? (
+                    <LoadingSpinner />
+                  ) : (
+                    <>
+                      {achievements.slice(0, 3).map((achievement) => (
+                        <div key={achievement.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/50">
+                          <div className="text-lg">{achievement.icon}</div>
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">{achievement.title}</p>
+                            <p className="text-xs text-muted-foreground">{achievement.description}</p>
+                          </div>
+                          <Badge variant="secondary" className="text-xs">
+                            {new Date(achievement.date).toLocaleDateString()}
+                          </Badge>
+                        </div>
+                      ))}
+                      <Button variant="outline" className="w-full" onClick={() => setActiveTab("achievements")}>
+                        View All Achievements
+                      </Button>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -329,15 +369,18 @@ export default function StudentProgress() {
           </TabsContent>
           
           <TabsContent value="courses" className="space-y-6 mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {enrolledCourses.map((course) => (
-                <ProgressCard 
-                  key={course.id} 
-                  course={course} 
-                  progress={courseProgress[course.id] || 0}
-                />
-              ))}
-            </div>
+            {coursesLoading ? (
+              <LoadingSpinner />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {enrolledCourses.map((studentCourse) => (
+                  <ProgressCard 
+                    key={studentCourse.id} 
+                    studentCourse={studentCourse}
+                  />
+                ))}
+              </div>
+            )}
           </TabsContent>
           
           <TabsContent value="activity" className="space-y-6 mt-6">
@@ -356,16 +399,34 @@ export default function StudentProgress() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="text-center">
-                    <div className="text-3xl font-bold text-orange-500">7</div>
-                    <div className="text-sm text-muted-foreground">Current Streak</div>
+                    <div className="text-3xl font-bold text-orange-500">
+                      {dashboardLoading ? (
+                        <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+                      ) : (
+                        dashboardData?.progress?.level || 1
+                      )}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Current Level</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold">12</div>
-                    <div className="text-sm text-muted-foreground">Longest Streak</div>
+                    <div className="text-2xl font-bold">
+                      {dashboardLoading ? (
+                        <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                      ) : (
+                        dashboardData?.progress?.totalPoints || 0
+                      )}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Total Points</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-2xl font-bold">4.2h</div>
-                    <div className="text-sm text-muted-foreground">Daily Average</div>
+                    <div className="text-2xl font-bold">
+                      {dashboardLoading ? (
+                        <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                      ) : (
+                        `${Math.round((dashboardData?.progress?.studyTime || 0) / (dashboardData?.progress?.enrolledCourses || 1))}m`
+                      )}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Avg per Course</div>
                   </div>
                 </CardContent>
               </Card>
@@ -373,11 +434,15 @@ export default function StudentProgress() {
           </TabsContent>
           
           <TabsContent value="achievements" className="space-y-6 mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {achievements.map((achievement) => (
-                <AchievementCard key={achievement.id} achievement={achievement} />
-              ))}
-            </div>
+            {dashboardLoading ? (
+              <LoadingSpinner />
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {allAchievements.map((achievement) => (
+                  <AchievementCard key={achievement.id} achievement={achievement} />
+                ))}
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>

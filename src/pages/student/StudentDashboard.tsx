@@ -3,17 +3,50 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { ProgressStats } from "@/components/shared/ProgressStats";
 import { useAuth } from "@/contexts/AuthContext";
-import { mockStudent } from "@/lib/mockData";
+import { useStudentDashboard } from "@/hooks/useStudentData";
 import { 
   Zap, 
-  ChevronRight
+  ChevronRight,
+  Loader2
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
 export default function StudentDashboard() {
   const { user } = useAuth();
+  const { data, isLoading, error } = useStudentDashboard();
   
   if (!user) return null;
+
+  if (isLoading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center space-y-4">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground" />
+            <p className="text-muted-foreground">Loading your dashboard...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (error) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center space-y-4">
+            <p className="text-destructive">Failed to load dashboard data</p>
+            <p className="text-sm text-muted-foreground">{error}</p>
+            <Button onClick={() => window.location.reload()}>
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!data) return null;
 
   return (
     <Layout>
@@ -43,12 +76,12 @@ export default function StudentDashboard() {
 
         {/* Progress Overview */}
         <ProgressStats
-          totalPoints={mockStudent.totalPoints}
-          level={mockStudent.level}
-          completedCourses={mockStudent.completedCourses.length}
-          enrolledCourses={mockStudent.enrolledCourses.length}
-          studyTime={45}
-          badges={mockStudent.badges.length}
+          totalPoints={data.progress.totalPoints}
+          level={data.progress.level}
+          completedCourses={data.progress.completedCourses}
+          enrolledCourses={data.progress.enrolledCourses}
+          studyTime={Math.round(data.progress.studyTime / 60)} // Convert minutes to hours
+          badges={data.progress.badges}
         />
 
         {/* Quick Actions */}
