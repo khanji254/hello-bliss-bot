@@ -1,36 +1,45 @@
+// src/components/auth/ProtectedRoute.tsx
+import { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserRole } from '@/types/user';
+import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
-  children: React.ReactNode;
+  children: ReactNode;
   allowedRoles?: UserRole[];
-  redirectTo?: string;
 }
 
-export function ProtectedRoute({ 
-  children, 
-  allowedRoles, 
-  redirectTo = '/auth' 
-}: ProtectedRouteProps) {
+export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const { user, isLoading } = useAuth();
   const location = useLocation();
 
+  // Show loading spinner while checking authentication
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
       </div>
     );
   }
 
+  // If not authenticated, redirect to login
   if (!user) {
-    return <Navigate to={redirectTo} state={{ from: location }} replace />;
+    return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
+  // If role-based access is specified, check user role
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/unauthorized" replace />;
+    // Redirect to appropriate dashboard based on user role
+    const redirectPath = user.role === 'student' ? '/student' : 
+                        user.role === 'teacher' ? '/teacher' : 
+                        '/auth';
+    return <Navigate to={redirectPath} replace />;
   }
 
+  // User is authenticated and has proper role
   return <>{children}</>;
 }

@@ -1,9 +1,9 @@
 // src/lib/api.ts
-// API Service for Students Backend Integration
+// Enhanced API Service with Full Course Integration
 
 const API_BASE_URL = 'http://127.0.0.1:8000/api';
 
-// API Helper Function (similar to your AuthContext)
+// API Helper Function
 const apiCall = async (endpoint: string, options: RequestInit = {}) => {
   const token = localStorage.getItem('accessToken');
   
@@ -50,7 +50,7 @@ const apiCall = async (endpoint: string, options: RequestInit = {}) => {
   }
 };
 
-// File upload helper (for FormData requests)
+// File upload helper
 const apiFileUpload = async (endpoint: string, formData: FormData) => {
   const token = localStorage.getItem('accessToken');
   
@@ -58,7 +58,6 @@ const apiFileUpload = async (endpoint: string, formData: FormData) => {
     method: 'POST',
     headers: {
       ...(token && { Authorization: `Bearer ${token}` }),
-      // Don't set Content-Type for FormData - browser will set it with boundary
     },
     body: formData,
   };
@@ -78,13 +77,6 @@ const apiFileUpload = async (endpoint: string, formData: FormData) => {
         errorMessage = data.detail;
       }
       
-      console.error('API Upload Error:', {
-        status: response.status,
-        statusText: response.statusText,  
-        data: data,
-        endpoint: endpoint
-      });
-      
       throw new Error(errorMessage);
     }
 
@@ -97,14 +89,165 @@ const apiFileUpload = async (endpoint: string, formData: FormData) => {
   }
 };
 
-// Authentication & Profile API Functions
+// ============================================================================
+// COURSES API - Complete Integration
+// ============================================================================
+
+export const coursesApi = {
+  // Get all categories
+  getCategories: async () => {
+    return await apiCall('/courses/categories/');
+  },
+
+  // Get all courses with filters
+  getCourses: async (params?: {
+    category?: string;
+    level?: string;
+    search?: string;
+    ordering?: string;
+    page?: number;
+  }) => {
+    const searchParams = new URLSearchParams();
+    
+    if (params?.category && params.category !== 'all') {
+      searchParams.set('category', params.category);
+    }
+    if (params?.level) searchParams.set('level', params.level);
+    if (params?.search) searchParams.set('search', params.search);
+    if (params?.ordering) searchParams.set('ordering', params.ordering);
+    if (params?.page) searchParams.set('page', params.page.toString());
+    
+    const queryString = searchParams.toString();
+    return await apiCall(`/courses/courses/${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Get course details by slug
+  getCourseBySlug: async (slug: string) => {
+    return await apiCall(`/courses/courses/${slug}/`);
+  },
+
+  // Get marketplace overview
+  getMarketplaceOverview: async () => {
+    return await apiCall('/courses/marketplace/overview/');
+  },
+
+  // Get course statistics
+  getCourseStats: async () => {
+    return await apiCall('/courses/marketplace/stats/');
+  },
+
+  // Get course suggestions
+  getCourseSuggestions: async () => {
+    return await apiCall('/courses/courses/suggestions/');
+  },
+
+  // Advanced search
+  searchCourses: async (params: {
+    q?: string;
+    category?: string;
+    level?: string;
+    min_rating?: number;
+    max_price?: number;
+    sort_by?: string;
+    page?: number;
+  }) => {
+    const searchParams = new URLSearchParams();
+    
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        searchParams.set(key, value.toString());
+      }
+    });
+    
+    const queryString = searchParams.toString();
+    return await apiCall(`/courses/search/${queryString ? `?${queryString}` : ''}`);
+  },
+
+  // Student enrollment
+  enrollInCourse: async (courseId: string) => {
+    return await apiCall(`/courses/courses/${courseId}/enroll/`, {
+      method: 'POST',
+    });
+  },
+
+  // Check enrollment status
+  getEnrollmentStatus: async (courseId: string) => {
+    return await apiCall(`/courses/courses/${courseId}/enrollment-status/`);
+  },
+
+  // Get student's enrollments
+  getMyEnrollments: async () => {
+    return await apiCall('/courses/enrollments/');
+  },
+
+  // Course reviews
+  getCourseReviews: async (courseId: string) => {
+    return await apiCall(`/courses/courses/${courseId}/reviews/`);
+  },
+
+  // Add course review
+  addCourseReview: async (courseId: string, reviewData: {
+    rating: number;
+    title?: string;
+    comment?: string;
+  }) => {
+    return await apiCall(`/courses/courses/${courseId}/reviews/`, {
+      method: 'POST',
+      body: JSON.stringify(reviewData),
+    });
+  },
+};
+
+// ============================================================================
+// TEACHER API - Course Management
+// ============================================================================
+
+export const teacherApi = {
+  // Get teacher's courses
+  getMyCourses: async () => {
+    return await apiCall('/courses/teacher/courses/');
+  },
+
+  // Create new course
+  createCourse: async (courseData: any) => {
+    return await apiCall('/courses/teacher/courses/', {
+      method: 'POST',
+      body: JSON.stringify(courseData),
+    });
+  },
+
+  // Update course
+  updateCourse: async (courseId: string, courseData: any) => {
+    return await apiCall(`/courses/teacher/courses/${courseId}/`, {
+      method: 'PUT',
+      body: JSON.stringify(courseData),
+    });
+  },
+
+  // Delete course
+  deleteCourse: async (courseId: string) => {
+    return await apiCall(`/courses/teacher/courses/${courseId}/`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Get teacher dashboard stats
+  getDashboardStats: async () => {
+    return await apiCall('/courses/teacher/dashboard/stats/');
+  },
+};
+
+// ============================================================================
+// AUTHENTICATION API (Enhanced)
+// ============================================================================
+
 export const authApi = {
   // Get full profile data
   getProfile: async () => {
     return await apiCall('/auth/profile/');
   },
 
-  // Update full profile
+  // Update profile
   updateProfile: async (profileData: any) => {
     return await apiCall('/auth/profile/update/', {
       method: 'PUT',
@@ -112,48 +255,9 @@ export const authApi = {
     });
   },
 
-  // Update basic profile (for onboarding)
-  updateBasicProfile: async (profileData: any) => {
-    return await apiCall('/auth/profile/basic/', {
-      method: 'PUT',
-      body: JSON.stringify(profileData),
-    });
-  },
-
-  // Update notification preferences
-  updateNotificationPreferences: async (preferences: any) => {
-    return await apiCall('/auth/profile/notifications/', {
-      method: 'PUT',
-      body: JSON.stringify(preferences),
-    });
-  },
-
-  // Update privacy settings
-  updatePrivacySettings: async (settings: any) => {
-    return await apiCall('/auth/profile/privacy/', {
-      method: 'PUT',
-      body: JSON.stringify(settings),
-    });
-  },
-
-  // Upload avatar (proper file upload)
+  // Upload avatar
   uploadAvatar: async (formData: FormData) => {
     return await apiFileUpload('/auth/profile/avatar/', formData);
-  },
-
-  // Upload avatar by URL (if you have an external URL)
-  uploadAvatarByUrl: async (avatarUrl: string) => {
-    return await apiCall('/auth/profile/avatar/', {
-      method: 'POST',
-      body: JSON.stringify({ avatar: avatarUrl }),
-    });
-  },
-
-  // Delete avatar
-  deleteAvatar: async () => {
-    return await apiCall('/auth/profile/avatar/', {
-      method: 'DELETE',
-    });
   },
 
   // Generate avatar placeholder URL
@@ -165,70 +269,31 @@ export const authApi = {
       .toUpperCase()
       .slice(0, 2);
     
-    const bgColor = backgroundColor || '3B82F6'; // Default blue
+    const bgColor = backgroundColor || '3B82F6';
     const textColor = 'FFFFFF';
     
     return `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=${bgColor}&color=${textColor}&size=200&font-size=0.6`;
   },
 };
 
-// Students API Functions
+// ============================================================================
+// STUDENTS API (Enhanced with Real Backend)
+// ============================================================================
+
 export const studentsApi = {
   // Get student dashboard data
   getDashboard: async () => {
     return await apiCall('/students/dashboard/');
   },
 
-  // Get all available courses
-  getCourses: async (params?: {
-    category?: string;
-    level?: string;
-    search?: string;
-  }) => {
-    const searchParams = new URLSearchParams();
-    if (params?.category) searchParams.set('category', params.category);
-    if (params?.level) searchParams.set('level', params.level);
-    if (params?.search) searchParams.set('search', params.search);
-    
-    const queryString = searchParams.toString();
-    return await apiCall(`/students/courses/${queryString ? `?${queryString}` : ''}`);
-  },
-
-  // Get course details
-  getCourseById: async (courseId: string) => {
-    return await apiCall(`/students/courses/${courseId}/`);
-  },
-
-  // Get student's enrolled courses
+  // Get student's enrolled courses (redirect to courses API)
   getStudentCourses: async (status?: string) => {
-    const queryString = status ? `?status=${status}` : '';
-    return await apiCall(`/students/my-courses/${queryString}`);
+    return await coursesApi.getMyEnrollments();
   },
 
-  // Enroll in a course
+  // Enroll in course (redirect to courses API)
   enrollCourse: async (courseId: string) => {
-    return await apiCall('/students/enroll/', {
-      method: 'POST',
-      body: JSON.stringify({ course_id: courseId }),
-    });
-  },
-
-  // Get course progress
-  getCourseProgress: async (courseId: string) => {
-    return await apiCall(`/students/course-progress/${courseId}/`);
-  },
-
-  // Update module progress
-  updateModuleProgress: async (data: {
-    module_id: string;
-    completed: boolean;
-    score?: number;
-    time_spent: number;
-  }) => {
-    return await apiCall('/students/update-progress/', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    return await coursesApi.enrollInCourse(courseId);
   },
 
   // Get student badges

@@ -40,52 +40,199 @@ const App = () => (
           <Toaster />
           <Sonner />
           <BrowserRouter>
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<Landing />} />
-          <Route path="/auth/*" element={<AuthPage />} />
-          
-          {/* Student Routes */}
-          <Route path="/student" element={<StudentDashboard />} />
-          <Route path="/student/courses" element={<StudentCourses />} />
-          <Route path="/student/progress" element={<StudentProgress />} />
-          
-          {/* Teacher Routes */}
-          <Route path="/teacher" element={<TeacherDashboard />} />
-          <Route path="/teacher/courses" element={<TeacherCourses />} />
-          <Route path="/teacher/create" element={<CreateCourse />} />
-          <Route path="/teacher/analytics" element={<TeacherAnalytics />} />
-          <Route path="/teacher/earnings" element={<TeacherEarnings />} />
-          <Route path="/teacher/students" element={<TeacherStudents />} />
-          
-          {/* Shared Routes */}
-          <Route path="/marketplace" element={<Marketplace />} />
-          <Route path="/courses/:id" element={<div>Course Detail</div>} />
-          
-          {/* Simulation Routes */}
-          <Route path="/simulations" element={<div>Simulation Hub</div>} />
-          <Route path="/simulations/circuit" element={<CircuitSimulator />} />
-          <Route path="/simulations/ros" element={<ROSPlayground />} />
-          <Route path="/simulations/programming" element={<div>Robot Programming</div>} />
-          
-          {/* Profile & Settings */}
-          <Route path="/profile" element={<StudentProfile />} />
-          <Route path="/settings" element={<Settings />} />
-          
-          {/* Admin Routes */}
-          <Route path="/admin" element={<div>Admin Dashboard</div>} />
-          <Route path="/admin/users" element={<div>Manage Users</div>} />
-          <Route path="/admin/courses" element={<div>Manage Courses</div>} />
-          <Route path="/admin/payments" element={<div>Manage Payments</div>} />
-          
-          {/* Catch-all */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </AuthProvider>
-</ThemeProvider>
-</QueryClientProvider>
+            <Routes>
+              {/* Public Routes */}
+              <Route path="/" element={<Landing />} />
+              <Route path="/auth/*" element={<AuthPage />} />
+              
+              {/* Student Protected Routes */}
+              <Route 
+                path="/student" 
+                element={
+                  <ProtectedRoute allowedRoles={["student"]}>
+                    <StudentDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/student/courses" 
+                element={
+                  <ProtectedRoute allowedRoles={["student"]}>
+                    <StudentCourses />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/student/progress" 
+                element={
+                  <ProtectedRoute allowedRoles={["student"]}>
+                    <StudentProgress />
+                  </ProtectedRoute>
+                } 
+              />
+              
+              {/* Teacher Protected Routes */}
+              <Route 
+                path="/teacher" 
+                element={
+                  <ProtectedRoute allowedRoles={["teacher"]}>
+                    <TeacherDashboard />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/teacher/courses" 
+                element={
+                  <ProtectedRoute allowedRoles={["teacher"]}>
+                    <TeacherCourses />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/teacher/create" 
+                element={
+                  <ProtectedRoute allowedRoles={["teacher"]}>
+                    <CreateCourse />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/teacher/analytics" 
+                element={
+                  <ProtectedRoute allowedRoles={["teacher"]}>
+                    <TeacherAnalytics />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/teacher/earnings" 
+                element={
+                  <ProtectedRoute allowedRoles={["teacher"]}>
+                    <TeacherEarnings />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/teacher/students" 
+                element={
+                  <ProtectedRoute allowedRoles={["teacher"]}>
+                    <TeacherStudents />
+                  </ProtectedRoute>
+                } 
+              />
+              
+              {/* Shared Protected Routes */}
+              <Route 
+                path="/marketplace" 
+                element={
+                  <ProtectedRoute allowedRoles={["student", "teacher"]}>
+                    <Marketplace />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/courses/:id" 
+                element={
+                  <ProtectedRoute allowedRoles={["student", "teacher"]}>
+                    <div>Course Detail</div>
+                  </ProtectedRoute>
+                } 
+              />
+              
+              {/* Simulation Routes - Allow both students and teachers */}
+              <Route 
+                path="/simulations" 
+                element={
+                  <ProtectedRoute allowedRoles={["student", "teacher"]}>
+                    <div>Simulation Hub</div>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/simulations/circuit" 
+                element={
+                  <ProtectedRoute allowedRoles={["student", "teacher"]}>
+                    <CircuitSimulator />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/simulations/ros" 
+                element={
+                  <ProtectedRoute allowedRoles={["student", "teacher"]}>
+                    <ROSPlayground />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/simulations/programming" 
+                element={
+                  <ProtectedRoute allowedRoles={["student", "teacher"]}>
+                    <div>Robot Programming</div>
+                  </ProtectedRoute>
+                } 
+              />
+              
+              {/* Profile & Settings - All authenticated users */}
+              <Route 
+                path="/profile" 
+                element={
+                  <ProtectedRoute allowedRoles={["student", "teacher", "admin"]}>
+                    <StudentProfile />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/settings" 
+                element={
+                  <ProtectedRoute allowedRoles={["student", "teacher", "admin"]}>
+                    <Settings />
+                  </ProtectedRoute>
+                } 
+              />
+              
+              {/* Admin Routes */}
+              <Route 
+                path="/admin" 
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <div>Admin Dashboard</div>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/admin/users" 
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <div>Manage Users</div>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/admin/courses" 
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <div>Manage Courses</div>
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/admin/payments" 
+                element={
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <div>Manage Payments</div>
+                  </ProtectedRoute>
+                } 
+              />
+              
+              {/* Catch-all */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </AuthProvider>
+    </ThemeProvider>
+  </QueryClientProvider>
 );
 
 export default App;

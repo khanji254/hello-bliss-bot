@@ -1,8 +1,8 @@
 // src/hooks/useStudentData.ts
-// Custom hooks for student data management
+// Fixed to handle the actual API response structure
 
 import { useState, useEffect } from 'react';
-import { studentsApi } from '@/lib/api';
+import { studentsApi, coursesApi } from '@/lib/api';
 
 // Hook for dashboard data
 export const useStudentDashboard = () => {
@@ -14,65 +14,14 @@ export const useStudentDashboard = () => {
     try {
       setIsLoading(true);
       setError(null);
+      
+      // Get the raw API response
       const apiData = await studentsApi.getDashboard();
+      console.log('Dashboard API response:', apiData); // Debug log
       
-      const transformedData = {
-        user: {
-          id: apiData.user.id,
-          email: apiData.user.email,
-          name: apiData.user.name,
-          role: apiData.user.role,
-          avatar: apiData.user.avatar,
-          createdAt: new Date(apiData.user.created_at)
-        },
-        progress: {
-          totalPoints: apiData.progress.total_points,
-          level: apiData.progress.level,
-          completedCourses: apiData.progress.completed_courses,
-          enrolledCourses: apiData.progress.enrolled_courses,
-          studyTime: apiData.progress.study_time,
-          badges: apiData.progress.badges_count
-        },
-        recentCourses: apiData.recent_courses.map((sc: any) => ({
-          id: sc.id,
-          course: {
-            id: sc.course.id,
-            title: sc.course.title,
-            description: sc.course.description,
-            teacherId: sc.course.teacher_id,
-            teacherName: sc.course.teacher_name,
-            price: sc.course.price,
-            duration: sc.course.duration,
-            level: sc.course.level,
-            category: sc.course.category,
-            thumbnail: sc.course.thumbnail || '/placeholder-course.jpg',
-            rating: sc.course.rating,
-            studentsCount: sc.course.students_count,
-            tags: sc.course.tags,
-            modules: sc.course.modules
-          },
-          status: sc.status,
-          progressPercentage: sc.progress_percentage,
-          enrolledAt: new Date(sc.enrolled_at),
-          completedAt: sc.completed_at ? new Date(sc.completed_at) : undefined
-        })),
-        badges: apiData.badges.map((badge: any) => ({
-          id: badge.badge_id,
-          name: badge.name,
-          description: badge.description,
-          icon: badge.icon,
-          earnedAt: new Date(badge.earned_at)
-        })),
-        activities: apiData.recent_activities.map((activity: any) => ({
-          id: activity.id,
-          type: activity.activity_type,
-          description: activity.description,
-          pointsEarned: activity.points_earned,
-          timestamp: new Date(activity.timestamp)
-        }))
-      };
+      // The API already returns the transformed data structure
+      setData(apiData);
       
-      setData(transformedData);
     } catch (err: any) {
       setError(err.message);
       console.error('Error fetching dashboard:', err);
@@ -88,7 +37,7 @@ export const useStudentDashboard = () => {
   return { data, isLoading, error, refetch: fetchDashboard };
 };
 
-// Hook for student courses
+// Hook for student courses (enrolled courses)
 export const useStudentCourses = (status?: string) => {
   const [courses, setCourses] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -98,34 +47,29 @@ export const useStudentCourses = (status?: string) => {
     try {
       setIsLoading(true);
       setError(null);
+      
+      // Use students API for enrolled courses
       const apiData = await studentsApi.getStudentCourses(status);
-      const transformedCourses = apiData.map((sc: any) => ({
-        id: sc.id,
-        course: {
-          id: sc.course.id,
-          title: sc.course.title,
-          description: sc.course.description,
-          teacherId: sc.course.teacher_id,
-          teacherName: sc.course.teacher_name,
-          price: sc.course.price,
-          duration: sc.course.duration,
-          level: sc.course.level,
-          category: sc.course.category,
-          thumbnail: sc.course.thumbnail || '/placeholder-course.jpg',
-          rating: sc.course.rating,
-          studentsCount: sc.course.students_count,
-          tags: sc.course.tags,
-          modules: sc.course.modules
-        },
-        status: sc.status,
-        progressPercentage: sc.progress_percentage,
-        enrolledAt: new Date(sc.enrolled_at),
-        completedAt: sc.completed_at ? new Date(sc.completed_at) : undefined
-      }));
-      setCourses(transformedCourses);
+      console.log('Student courses API response:', apiData); // Debug log
+      
+      // Check if apiData is an array, if not handle accordingly
+      if (Array.isArray(apiData)) {
+        setCourses(apiData);
+      } else if (apiData && apiData.results && Array.isArray(apiData.results)) {
+        // Handle paginated response
+        setCourses(apiData.results);
+      } else if (apiData && Array.isArray(apiData.data)) {
+        // Handle wrapped response
+        setCourses(apiData.data);
+      } else {
+        console.warn('Unexpected API response structure:', apiData);
+        setCourses([]);
+      }
+      
     } catch (err: any) {
       setError(err.message);
       console.error('Error fetching student courses:', err);
+      setCourses([]);
     } finally {
       setIsLoading(false);
     }
@@ -137,8 +81,8 @@ export const useStudentCourses = (status?: string) => {
 
   const enrollInCourse = async (courseId: string) => {
     try {
-      await studentsApi.enrollCourse(courseId);
-      await fetchStudentCourses();
+      await coursesApi.enrollInCourse(courseId);
+      await fetchStudentCourses(); // Refresh the list
       return true;
     } catch (err: any) {
       setError(err.message);
@@ -169,27 +113,28 @@ export const useCourses = (params?: {
     try {
       setIsLoading(true);
       setError(null);
-      const apiData = await studentsApi.getCourses(params);
-      const transformedCourses = apiData.results.map((course: any) => ({
-        id: course.id,
-        title: course.title,
-        description: course.description,
-        teacherId: course.teacher_id,
-        teacherName: course.teacher_name,
-        price: course.price,
-        duration: course.duration,
-        level: course.level,
-        category: course.category,
-        thumbnail: course.thumbnail || '/placeholder-course.jpg',
-        rating: course.rating,
-        studentsCount: course.students_count,
-        tags: course.tags,
-        modules: course.modules
-      }));
-      setCourses(transformedCourses);
+      
+      const apiData = await coursesApi.getCourses(params);
+      console.log('Courses API response:', apiData); // Debug log
+      
+      // Handle different response structures
+      if (Array.isArray(apiData)) {
+        setCourses(apiData);
+      } else if (apiData && apiData.results && Array.isArray(apiData.results)) {
+        // Handle paginated response
+        setCourses(apiData.results);
+      } else if (apiData && Array.isArray(apiData.data)) {
+        // Handle wrapped response
+        setCourses(apiData.data);
+      } else {
+        console.warn('Unexpected courses API response structure:', apiData);
+        setCourses([]);
+      }
+      
     } catch (err: any) {
       setError(err.message);
       console.error('Error fetching courses:', err);
+      setCourses([]);
     } finally {
       setIsLoading(false);
     }
@@ -197,7 +142,50 @@ export const useCourses = (params?: {
 
   useEffect(() => {
     fetchCourses();
-  }, [params]);
+  }, [params?.category, params?.level, params?.search]);
 
   return { courses, isLoading, error, refetch: fetchCourses };
+};
+
+// Hook for course enrollments specifically
+export const useCourseEnrollments = () => {
+  const [enrollments, setEnrollments] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchEnrollments = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Use courses API for enrollments
+      const apiData = await coursesApi.getMyEnrollments();
+      console.log('Enrollments API response:', apiData); // Debug log
+      
+      // Handle different response structures
+      if (Array.isArray(apiData)) {
+        setEnrollments(apiData);
+      } else if (apiData && apiData.results && Array.isArray(apiData.results)) {
+        setEnrollments(apiData.results);
+      } else if (apiData && Array.isArray(apiData.data)) {
+        setEnrollments(apiData.data);
+      } else {
+        console.warn('Unexpected enrollments API response structure:', apiData);
+        setEnrollments([]);
+      }
+      
+    } catch (err: any) {
+      setError(err.message);
+      console.error('Error fetching enrollments:', err);
+      setEnrollments([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEnrollments();
+  }, []);
+
+  return { enrollments, isLoading, error, refetch: fetchEnrollments };
 };
