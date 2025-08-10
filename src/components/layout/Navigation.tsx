@@ -1,14 +1,14 @@
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Home, 
-  BookOpen, 
-  Monitor, 
-  ShoppingBag, 
-  User, 
-  Settings, 
-  Award, 
+import {
+  Home,
+  BookOpen,
+  Monitor,
+  ShoppingBag,
+  User,
+  Settings,
+  Award,
   BarChart3,
   Users,
   DollarSign,
@@ -16,7 +16,11 @@ import {
   Bot,
   Cpu,
   Code,
-  Shield
+  Shield,
+  Zap,
+  CircuitBoard,
+  Activity,
+  Cpu as CpuIcon
 } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { UserRole } from "@/types/user";
@@ -98,9 +102,29 @@ const navigationItems: NavItem[] = [
   
   // Simulation tools (all users)
   {
-    title: "Circuit Simulator",
+    title: "Simulation Hub",
+    href: "/simulations",
+    icon: Monitor,
+    roles: ["student", "teacher", "admin"]
+  },
+  {
+    title: "Basic Circuit Simulator",
     href: "/simulations/circuit",
-    icon: Cpu,
+    icon: Activity,
+    roles: ["student", "teacher", "admin"]
+  },
+  {
+    title: "Microcontroller Lab",
+    href: "/simulations/arduino",
+    icon: CpuIcon,
+    badge: "Preview",
+    roles: ["student", "teacher", "admin"]
+  },
+  {
+    title: "Advanced Electronics",
+    href: "/simulations/electronics",
+    icon: CircuitBoard,
+    badge: "Pro",
     roles: ["student", "teacher", "admin"]
   },
   {
@@ -164,6 +188,16 @@ export function Navigation({ userRole, className }: NavigationProps) {
     item.roles.includes(userRole)
   );
 
+  const isSim = (href: string) => href.startsWith("/simulations");
+  const simCategory = (href: string): "Electronics" | "Arduino" | "Robotics" | "Programming" | "Hub" => {
+    if (href === "/simulations") return "Hub";
+    if (href.includes("/arduino")) return "Arduino";
+    if (href.includes("/electronics") || href.includes("/circuit")) return "Electronics";
+    if (href.includes("/ros")) return "Robotics";
+    if (href.includes("/programming")) return "Programming";
+    return "Electronics";
+  };
+
   // Group items by section
   const sections = [
     {
@@ -184,9 +218,7 @@ export function Navigation({ userRole, className }: NavigationProps) {
     },
     {
       title: "Simulations",
-      items: filteredItems.filter(item => 
-        ["Circuit Simulator", "ROS Playground", "Robot Programming"].includes(item.title)
-      )
+      items: filteredItems.filter(item => isSim(item.href))
     },
     {
       title: "Account",
@@ -204,7 +236,7 @@ export function Navigation({ userRole, className }: NavigationProps) {
             {section.title}
           </h3>
           <div className="space-y-1">
-            {section.items.map((item) => {
+            {section.title !== "Simulations" && section.items.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.href || 
                 (item.href !== "/" && location.pathname.startsWith(item.href));
@@ -231,6 +263,53 @@ export function Navigation({ userRole, className }: NavigationProps) {
                 </Button>
               );
             })}
+
+            {section.title === "Simulations" && (
+              <div className="space-y-3">
+                {/* Hub on top */}
+                {section.items.filter(i => simCategory(i.href) === "Hub").map((item) => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + "/");
+                  return (
+                    <Button key={item.href} variant={isActive ? "secondary" : "ghost"} className="w-full justify-start gap-3 h-10" asChild>
+                      <Link to={item.href}>
+                        <Icon className="h-4 w-4" />
+                        <span className="flex-1 text-left">{item.title}</span>
+                      </Link>
+                    </Button>
+                  );
+                })}
+
+                {(["Electronics", "Arduino", "Robotics", "Programming"] as const).map((cat) => {
+                  const items = section.items
+                    .filter(i => simCategory(i.href) === cat)
+                    .sort((a, b) => a.title.localeCompare(b.title));
+                  if (!items.length) return null;
+                  return (
+                    <div key={cat} className="space-y-1">
+                      <div className="px-3 text-[10px] uppercase tracking-wider text-muted-foreground">{cat}</div>
+                      {items.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + "/");
+                        return (
+                          <Button key={item.href} variant={isActive ? "secondary" : "ghost"} className="w-full justify-start gap-3 h-9" asChild>
+                            <Link to={item.href}>
+                              <Icon className="h-4 w-4" />
+                              <span className="flex-1 text-left">{item.title}</span>
+                              {item.badge && (
+                                <Badge variant={item.badge === "Pro" ? "secondary" : "destructive"} className="ml-auto">
+                                  {item.badge}
+                                </Badge>
+                              )}
+                            </Link>
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       ))}

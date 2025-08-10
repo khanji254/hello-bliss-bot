@@ -18,7 +18,13 @@ import StudentDashboard from "./pages/student/StudentDashboard";
 import TeacherDashboard from "./pages/teacher/TeacherDashboard";
 import Marketplace from "./pages/marketplace/Marketplace";
 import CircuitSimulator from "./pages/simulations/CircuitSimulator";
+import CircuitSimulatorHybrid from "./pages/simulations/CircuitSimulatorHybrid";
+import CircuitSimulatorProfessional from "./pages/simulations/CircuitSimulatorProfessional";
+import ArduinoPlayground from "./pages/simulations/ArduinoPlayground";
+import AdvancedElectronicsSimulator from "./pages/simulations/AdvancedElectronicsSimulator";
+import SimulationHub from "./pages/simulations/SimulationHub";
 import ROSPlayground from "./pages/simulations/ROSPlayground";
+import { RobotProgramming } from "./pages/simulations/RobotProgramming";
 import StudentCourses from "./pages/student/StudentCourses";
 import StudentProgress from "./pages/student/StudentProgress";
 import StudentProfile from "./pages/student/StudentProfile";
@@ -27,6 +33,10 @@ import TeacherCourses from "./pages/teacher/TeacherCourses";
 import TeacherAnalytics from "./pages/teacher/TeacherAnalytics";
 import TeacherEarnings from "./pages/teacher/TeacherEarnings";
 import CreateCourse from "./pages/teacher/CreateCourse";
+import { AdminDashboard } from "./pages/admin/AdminDashboard";
+import { ManageUsers } from "./pages/admin/ManageUsers";
+import { ManageCourses } from "./pages/admin/ManageCourses";
+import { ManagePayments } from "./pages/admin/ManagePayments";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -144,19 +154,23 @@ const App = () => (
                 path="/simulations" 
                 element={
                   <ProtectedRoute allowedRoles={["student", "teacher"]}>
-                    <div>Simulation Hub</div>
+                    <SimulationHub />} />
+          <Route path="/simulations/circuit" element={<CircuitSimulatorProfessional />} />
+          <Route path="/simulations/circuit-hybrid" element={<CircuitSimulatorHybrid />
                   </ProtectedRoute>
                 } 
               />
               <Route 
-                path="/simulations/circuit" 
+                path="/simulations/circuit-legacy" 
                 element={
                   <ProtectedRoute allowedRoles={["student", "teacher"]}>
                     <CircuitSimulator />
                   </ProtectedRoute>
                 } 
               />
-              <Route 
+              <Route path="/simulations/arduino" element={<ArduinoPlayground />} />
+          <Route path="/simulations/electronics" element={<AdvancedElectronicsSimulator />} />
+          <Route 
                 path="/simulations/ros" 
                 element={
                   <ProtectedRoute allowedRoles={["student", "teacher"]}>
@@ -168,7 +182,8 @@ const App = () => (
                 path="/simulations/programming" 
                 element={
                   <ProtectedRoute allowedRoles={["student", "teacher"]}>
-                    <div>Robot Programming</div>
+                    <RobotProgramming />} />
+          <Route path="/simulations/mcu" element={<ArduinoPlayground />
                   </ProtectedRoute>
                 } 
               />
@@ -196,7 +211,7 @@ const App = () => (
                 path="/admin" 
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
-                    <div>Admin Dashboard</div>
+                    <AdminDashboard />
                   </ProtectedRoute>
                 } 
               />
@@ -204,7 +219,7 @@ const App = () => (
                 path="/admin/users" 
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
-                    <div>Manage Users</div>
+                    <ManageUsers />
                   </ProtectedRoute>
                 } 
               />
@@ -212,7 +227,7 @@ const App = () => (
                 path="/admin/courses" 
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
-                    <div>Manage Courses</div>
+                    <ManageCourses />
                   </ProtectedRoute>
                 } 
               />
@@ -220,7 +235,7 @@ const App = () => (
                 path="/admin/payments" 
                 element={
                   <ProtectedRoute allowedRoles={["admin"]}>
-                    <div>Manage Payments</div>
+                    <ManagePayments />
                   </ProtectedRoute>
                 } 
               />
