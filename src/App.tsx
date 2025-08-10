@@ -154,9 +154,23 @@ const App = () => (
                 path="/simulations" 
                 element={
                   <ProtectedRoute allowedRoles={["student", "teacher"]}>
-                    <SimulationHub />} />
-          <Route path="/simulations/circuit" element={<CircuitSimulatorProfessional />} />
-          <Route path="/simulations/circuit-hybrid" element={<CircuitSimulatorHybrid />
+                    <SimulationHub />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/simulations/circuit" 
+                element={
+                  <ProtectedRoute allowedRoles={["student", "teacher"]}>
+                    <CircuitSimulatorProfessional />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/simulations/circuit-hybrid" 
+                element={
+                  <ProtectedRoute allowedRoles={["student", "teacher"]}>
+                    <CircuitSimulatorHybrid />
                   </ProtectedRoute>
                 } 
               />
@@ -168,9 +182,23 @@ const App = () => (
                   </ProtectedRoute>
                 } 
               />
-              <Route path="/simulations/arduino" element={<ArduinoPlayground />} />
-          <Route path="/simulations/electronics" element={<AdvancedElectronicsSimulator />} />
-          <Route 
+              <Route 
+                path="/simulations/arduino" 
+                element={
+                  <ProtectedRoute allowedRoles={["student", "teacher"]}>
+                    <ArduinoPlayground />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/simulations/electronics" 
+                element={
+                  <ProtectedRoute allowedRoles={["student", "teacher"]}>
+                    <AdvancedElectronicsSimulator />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
                 path="/simulations/ros" 
                 element={
                   <ProtectedRoute allowedRoles={["student", "teacher"]}>
@@ -182,8 +210,15 @@ const App = () => (
                 path="/simulations/programming" 
                 element={
                   <ProtectedRoute allowedRoles={["student", "teacher"]}>
-                    <RobotProgramming />} />
-          <Route path="/simulations/mcu" element={<ArduinoPlayground />
+                    <RobotProgramming />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/simulations/mcu" 
+                element={
+                  <ProtectedRoute allowedRoles={["student", "teacher"]}>
+                    <ArduinoPlayground />
                   </ProtectedRoute>
                 } 
               />
