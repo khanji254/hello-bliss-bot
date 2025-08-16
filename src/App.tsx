@@ -39,6 +39,8 @@ import { ManageCourses } from "./pages/admin/ManageCourses";
 import { ManagePayments } from "./pages/admin/ManagePayments";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import IsaacSim from "./pages/simulations/IsaacSim";
+import WebotsSim from "./pages/simulations/WebotsSim";
 
 const queryClient = new QueryClient();
 
@@ -199,6 +201,14 @@ const App = () => (
                 } 
               />
               <Route 
+                path="/simulations/isaac" 
+                element={
+                  <ProtectedRoute allowedRoles={["student", "teacher"]}>
+                    <IsaacSim />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
                 path="/simulations/ros" 
                 element={
                   <ProtectedRoute allowedRoles={["student", "teacher"]}>
@@ -219,6 +229,14 @@ const App = () => (
                 element={
                   <ProtectedRoute allowedRoles={["student", "teacher"]}>
                     <ArduinoPlayground />
+                  </ProtectedRoute>
+                } 
+              />
+              <Route 
+                path="/simulations/webots" 
+                element={
+                  <ProtectedRoute allowedRoles={["student", "teacher"]}>
+                    <WebotsSim />
                   </ProtectedRoute>
                 } 
               />

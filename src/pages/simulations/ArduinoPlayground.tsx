@@ -288,6 +288,7 @@ export default function ArduinoPlayground() {
         <div className="space-y-3 w-full">
           <iframe
             ref={wokwiFrameRef}
+            
             title="Wokwi"
             className="w-full h-[600px] border rounded"
             src={wokwiSrc}

@@ -134,6 +134,19 @@ const navigationItems: NavItem[] = [
     roles: ["student", "teacher", "admin"]
   },
   {
+    title: "Isaac Sim",
+    href: "/simulations/isaac",
+    icon: Cpu,
+    badge: "Pro",
+    roles: ["student", "teacher", "admin"]
+  },
+  {
+    title: "Webots Online",
+    href: "/simulations/webots",
+    icon: Bot,
+    roles: ["student", "teacher", "admin"]
+  },
+  {
     title: "Robot Programming",
     href: "/simulations/programming",
     icon: Code,
@@ -193,7 +206,7 @@ export function Navigation({ userRole, className }: NavigationProps) {
     if (href === "/simulations") return "Hub";
     if (href.includes("/arduino")) return "Arduino";
     if (href.includes("/electronics") || href.includes("/circuit")) return "Electronics";
-    if (href.includes("/ros")) return "Robotics";
+    if (href.includes("/ros") || href.includes("/isaac") || href.includes("/webots")) return "Robotics";
     if (href.includes("/programming")) return "Programming";
     return "Electronics";
   };

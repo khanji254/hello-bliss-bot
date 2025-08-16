@@ -76,6 +76,18 @@ const SimulationHub: React.FC = () => {
       category: 'Electronics'
     },
     {
+      id: 'isaac-sim',
+      title: 'Isaac Sim',
+      description: 'Omniverse streaming robotics simulator with template bots',
+      icon: Cpu,
+      color: 'from-emerald-500 to-emerald-600',
+      badge: 'Pro',
+      features: ['Robotics', 'WebRTC Streaming', 'Template Bots', 'Omniverse'],
+      href: '/simulations/isaac',
+      difficulty: 'Advanced',
+      category: 'Robotics'
+    },
+    {
       id: 'ros-playground',
       title: 'ROS Playground',
       description: 'Robot Operating System simulation and development environment',
@@ -96,6 +108,17 @@ const SimulationHub: React.FC = () => {
       href: '/simulations/programming',
       difficulty: 'Intermediate',
       category: 'Programming'
+    },
+    {
+      id: 'webots',
+      title: 'Webots Online',
+      description: 'Free, web-friendly robotics simulator (embed via webots.cloud)',
+      icon: Bot,
+      color: 'from-emerald-500 to-emerald-600',
+      features: ['e-puck', 'Manipulator', 'Drone', 'Web-based'],
+      href: '/simulations/webots',
+      difficulty: 'Advanced',
+      category: 'Robotics'
     }
   ];
 
@@ -117,7 +140,7 @@ const SimulationHub: React.FC = () => {
   };
 
   const stats = [
-    { label: 'Active Simulators', value: '5', icon: Play },
+    { label: 'Active Simulators', value: '7', icon: Play },
     { label: 'Students Using', value: '1.2k+', icon: Users },
     { label: 'Simulation Hours', value: '15k+', icon: Clock },
     { label: 'Success Rate', value: '98%', icon: Gauge }
@@ -204,6 +227,40 @@ const SimulationHub: React.FC = () => {
                         ))}
                       </div>
                     </div>
+
+                    {simulator.id === 'isaac-sim' && (
+                      <div>
+                        <h4 className="font-medium text-gray-800 mb-2">Quick Links:</h4>
+                        <div className="flex flex-wrap gap-2">
+                          <Button variant="outline" onClick={() => navigate('/simulations/isaac?template=warehouse-bot')}>
+                            Warehouse Bot
+                          </Button>
+                          <Button variant="outline" onClick={() => navigate('/simulations/isaac?template=manipulator')}>
+                            Manipulator Arm
+                          </Button>
+                          <Button variant="outline" onClick={() => navigate('/simulations/isaac?template=inspection-drone')}>
+                            Inspection Drone
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {simulator.id === 'webots' && (
+                      <div>
+                        <h4 className="font-medium text-gray-800 mb-2">Quick Links:</h4>
+                        <div className="flex flex-wrap gap-2">
+                          <Button variant="outline" onClick={() => navigate('/simulations/webots?template=e-puck')}>
+                            e-puck
+                          </Button>
+                          <Button variant="outline" onClick={() => navigate('/simulations/webots?template=panda-arm')}>
+                            Panda Arm
+                          </Button>
+                          <Button variant="outline" onClick={() => navigate('/simulations/webots?template=drone')}>
+                            Drone
+                          </Button>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between pt-4 border-t">
                       <div className="text-sm text-gray-500">
