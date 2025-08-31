@@ -76,12 +76,16 @@ export default function StudentDashboard() {
 
         {/* Progress Overview */}
         <ProgressStats
-          totalPoints={data.progress.totalPoints}
-          level={data.progress.level}
-          completedCourses={data.progress.completedCourses}
-          enrolledCourses={data.progress.enrolledCourses}
-          studyTime={Math.round(data.progress.studyTime / 60)} // Convert minutes to hours
-          badges={data.progress.badges}
+          stats={{
+            totalCourses: data.progress.enrolledCourses,
+            completedCourses: data.progress.completedCourses,
+            totalPoints: data.progress.totalPoints,
+            level: data.progress.level,
+            studyTime: Math.round(data.progress.studyTime / 60),
+            badges: data.progress.badges,
+            weeklyGoal: 10,
+            weeklyProgress: 7
+          }}
         />
 
         {/* Quick Actions */}

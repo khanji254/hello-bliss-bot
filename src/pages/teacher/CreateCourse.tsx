@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Layout } from "@/components/layout/Layout";
+import { LessonEditor, LessonContent } from "@/components/course/LessonEditor";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,73 +11,39 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import { 
   Plus,
   Upload,
   BookOpen,
   Video,
   Link,
-  Users,
   Monitor,
   Terminal,
   CircuitBoard,
   Cog,
   Calendar,
-  Clock,
-  DollarSign,
   Globe,
-  Lock,
-  Eye,
-  EyeOff,
+  Award,
   Save,
   Send,
   FileText,
   Image,
-  Paperclip,
-  Mic,
-  Camera,
-  Play,
-  Pause,
-  SkipForward,
-  Volume2,
-  Maximize,
-  MessageSquare,
-  Users2,
-  Presentation,
-  FileCode,
   Database,
-  Zap,
-  Target,
-  Award,
-  CheckCircle,
-  ArrowRight,
-  ArrowLeft,
   X,
-  Edit3,
   Trash2,
-  Copy,
   Settings,
-  Share2,
-  Download
+  ChevronDown,
+  ChevronRight
 } from "lucide-react";
 
 interface CourseSection {
   id: string;
   title: string;
   description: string;
-  lessons: CourseLesson[];
+  lessons: LessonContent[];
   isCollapsed: boolean;
-}
-
-interface CourseLesson {
-  id: string;
-  title: string;
-  type: 'video' | 'text' | 'quiz' | 'assignment' | 'simulation' | 'live';
-  duration: number;
-  content: any;
-  resources: Resource[];
 }
 
 interface Resource {
@@ -87,13 +54,10 @@ interface Resource {
   size?: string;
 }
 
-interface ClassroomTool {
+interface ExternalLink {
   id: string;
-  name: string;
-  icon: any;
-  description: string;
-  type: 'simulation' | 'terminal' | 'whiteboard' | 'screen_share' | 'breakout';
-  enabled: boolean;
+  title: string;
+  url: string;
 }
 
 const courseCategories = [
@@ -114,59 +78,9 @@ const difficultyLevels = [
   { value: 'expert', label: 'Expert', description: 'Professional level expertise needed' }
 ];
 
-const classroomTools: ClassroomTool[] = [
-  {
-    id: 'circuit_sim',
-    name: 'Circuit Simulator',
-    icon: CircuitBoard,
-    description: 'Interactive circuit design and simulation',
-    type: 'simulation',
-    enabled: true
-  },
-  {
-    id: 'ros_playground',
-    name: 'ROS Playground',
-    icon: Cog,
-    description: 'Robot Operating System environment',
-    type: 'simulation',
-    enabled: true
-  },
-  {
-    id: 'code_terminal',
-    name: 'Code Terminal',
-    icon: Terminal,
-    description: 'Shared coding environment with real-time collaboration',
-    type: 'terminal',
-    enabled: true
-  },
-  {
-    id: 'whiteboard',
-    name: 'Interactive Whiteboard',
-    icon: Edit3,
-    description: 'Digital whiteboard for collaborative problem solving',
-    type: 'whiteboard',
-    enabled: true
-  },
-  {
-    id: 'screen_share',
-    name: 'Screen Sharing',
-    icon: Monitor,
-    description: 'Share your screen with students in real-time',
-    type: 'screen_share',
-    enabled: true
-  },
-  {
-    id: 'breakout_rooms',
-    name: 'Breakout Teams',
-    icon: Users2,
-    description: 'Create small groups for collaborative projects',
-    type: 'breakout',
-    enabled: true
-  }
-];
-
 export default function CreateCourse() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
   const [courseData, setCourseData] = useState({
     title: '',
@@ -175,6 +89,7 @@ export default function CreateCourse() {
     difficulty: '',
     price: '',
     thumbnail: null as File | null,
+    thumbnailPreview: null as string | null,
     tags: [] as string[],
     duration: '',
     isPublic: true,
@@ -185,11 +100,18 @@ export default function CreateCourse() {
   });
 
   const [sections, setSections] = useState<CourseSection[]>([]);
-  const [enabledTools, setEnabledTools] = useState<string[]>(
-    classroomTools.filter(tool => tool.enabled).map(tool => tool.id)
-  );
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [externalLinks, setExternalLinks] = useState<ExternalLink[]>([
+    {
+      id: '1',
+      title: 'Arduino Official Documentation',
+      url: 'https://docs.arduino.cc/'
+    }
+  ]);
   const [currentTag, setCurrentTag] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [newLinkTitle, setNewLinkTitle] = useState('');
+  const [newLinkUrl, setNewLinkUrl] = useState('');
 
   const totalSteps = 5;
   const progressPercentage = (currentStep / totalSteps) * 100;
@@ -236,14 +158,23 @@ export default function CreateCourse() {
     setSections([...sections, newSection]);
   };
 
+  const handleDeleteSection = (sectionId: string) => {
+    setSections(sections.filter(section => section.id !== sectionId));
+    toast({
+      title: "Section deleted",
+      description: "The section has been removed from your course."
+    });
+  };
+
   const handleAddLesson = (sectionId: string) => {
-    const newLesson: CourseLesson = {
+    const newLesson: LessonContent = {
       id: `lesson_${Date.now()}`,
       title: 'New Lesson',
-      type: 'video',
-      duration: 0,
+      type: 'text',
+      duration: 15,
       content: {},
-      resources: []
+      resources: [],
+      isPublished: false
     };
 
     setSections(sections.map(section => 
@@ -253,22 +184,108 @@ export default function CreateCourse() {
     ));
   };
 
-  const handleToolToggle = (toolId: string) => {
-    setEnabledTools(prev => 
-      prev.includes(toolId) 
-        ? prev.filter(id => id !== toolId)
-        : [...prev, toolId]
-    );
+  const handleUpdateLesson = (sectionId: string, updatedLesson: LessonContent) => {
+    setSections(sections.map(section => 
+      section.id === sectionId 
+        ? { 
+            ...section, 
+            lessons: section.lessons.map(lesson => 
+              lesson.id === updatedLesson.id ? updatedLesson : lesson
+            )
+          }
+        : section
+    ));
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'thumbnail' | 'resource') => {
+  const handleDeleteLesson = (sectionId: string, lessonId: string) => {
+    setSections(sections.map(section => 
+      section.id === sectionId 
+        ? { 
+            ...section, 
+            lessons: section.lessons.filter(lesson => lesson.id !== lessonId)
+          }
+        : section
+    ));
+    toast({
+      title: "Lesson deleted",
+      description: "The lesson has been removed from the section."
+    });
+  };
+
+  const handleThumbnailUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (type === 'thumbnail') {
-        setCourseData({ ...courseData, thumbnail: file });
+      if (file.size > 2 * 1024 * 1024) { // 2MB limit
+        toast({
+          title: "File too large",
+          description: "Please select an image smaller than 2MB.",
+          variant: "destructive"
+        });
+        return;
       }
-      // Handle resource upload logic here
+
+      setCourseData({ 
+        ...courseData, 
+        thumbnail: file,
+        thumbnailPreview: URL.createObjectURL(file)
+      });
+      
+      toast({
+        title: "Image uploaded",
+        description: "Course thumbnail has been updated."
+      });
     }
+  };
+
+  const handleAddExternalLink = () => {
+    if (newLinkTitle.trim() && newLinkUrl.trim()) {
+      const newLink: ExternalLink = {
+        id: `link_${Date.now()}`,
+        title: newLinkTitle.trim(),
+        url: newLinkUrl.trim()
+      };
+      setExternalLinks([...externalLinks, newLink]);
+      setNewLinkTitle('');
+      setNewLinkUrl('');
+      toast({
+        title: "Link added",
+        description: "External resource has been added to your course."
+      });
+    }
+  };
+
+  const handleDeleteExternalLink = (linkId: string) => {
+    setExternalLinks(externalLinks.filter(link => link.id !== linkId));
+    toast({
+      title: "Link removed",
+      description: "External resource has been removed."
+    });
+  };
+
+  const handleFileUpload = (type: 'documents' | 'videos' | 'code' | 'assets') => {
+    // Simulated file upload - in real implementation, this would upload to storage
+    setIsUploading(true);
+    setTimeout(() => {
+      setIsUploading(false);
+      toast({
+        title: "Upload successful",
+        description: `${type} have been uploaded to your course resources.`
+      });
+    }, 2000);
+  };
+
+  const handleSaveDraft = () => {
+    toast({
+      title: "Draft saved",
+      description: "Your course progress has been saved as a draft."
+    });
+  };
+
+  const handlePublishCourse = () => {
+    toast({
+      title: "Course published!",
+      description: "Your course is now live and available to students."
+    });
   };
 
   const renderStepContent = () => {
@@ -364,23 +381,41 @@ export default function CreateCourse() {
 
                 <div>
                   <Label>Course Thumbnail</Label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                    <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                    <div className="mt-2">
-                      <Button variant="outline" onClick={() => document.getElementById('thumbnail-upload')?.click()}>
-                        Upload Image
-                      </Button>
-                      <input
-                        id="thumbnail-upload"
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => handleFileUpload(e, 'thumbnail')}
-                      />
-                    </div>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      PNG, JPG up to 2MB
-                    </p>
+                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+                    {courseData.thumbnailPreview ? (
+                      <div className="space-y-4">
+                        <img 
+                          src={courseData.thumbnailPreview} 
+                          alt="Course thumbnail" 
+                          className="mx-auto h-32 w-48 object-cover rounded"
+                        />
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setCourseData({ ...courseData, thumbnail: null, thumbnailPreview: null })}
+                        >
+                          Remove Image
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
+                        <div className="mt-2">
+                          <Button variant="outline" onClick={() => document.getElementById('thumbnail-upload')?.click()}>
+                            Upload Image
+                          </Button>
+                          <input
+                            id="thumbnail-upload"
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleThumbnailUpload}
+                          />
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          PNG, JPG up to 2MB
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -429,17 +464,28 @@ export default function CreateCourse() {
               <CardContent>
                 {sections.length === 0 ? (
                   <div className="text-center py-8">
-                    <BookOpen className="mx-auto h-12 w-12 text-gray-400" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">No sections yet</h3>
-                    <p className="mt-1 text-sm text-gray-500">Get started by creating your first section.</p>
+                    <BookOpen className="mx-auto h-12 w-12 text-muted-foreground" />
+                    <h3 className="mt-2 text-sm font-medium">No sections yet</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">Get started by creating your first section.</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    {sections.map((section, index) => (
+                    {sections.map((section) => (
                       <Card key={section.id}>
                         <CardHeader className="pb-3">
                           <div className="flex items-center justify-between">
-                            <div className="flex-1">
+                            <div className="flex-1 flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSections(sections.map(s => 
+                                    s.id === section.id ? { ...s, isCollapsed: !s.isCollapsed } : s
+                                  ));
+                                }}
+                              >
+                                {section.isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                              </Button>
                               <Input
                                 value={section.title}
                                 onChange={(e) => {
@@ -447,7 +493,7 @@ export default function CreateCourse() {
                                     s.id === section.id ? { ...s, title: e.target.value } : s
                                   ));
                                 }}
-                                className="font-semibold"
+                                className="font-semibold border-none p-0 h-auto"
                               />
                             </div>
                             <div className="flex items-center space-x-2">
@@ -455,77 +501,30 @@ export default function CreateCourse() {
                                 <Plus className="h-4 w-4 mr-1" />
                                 Add Lesson
                               </Button>
-                              <Button variant="ghost" size="sm">
+                              <Button variant="ghost" size="sm" onClick={() => handleDeleteSection(section.id)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </div>
                         </CardHeader>
-                        <CardContent>
-                          {section.lessons.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No lessons in this section yet.</p>
-                          ) : (
-                            <div className="space-y-2">
-                              {section.lessons.map((lesson, lessonIndex) => (
-                                <div key={lesson.id} className="flex items-center justify-between p-3 border rounded">
-                                  <div className="flex items-center space-x-3">
-                                    <div className="text-sm text-muted-foreground">
-                                      {lessonIndex + 1}.
-                                    </div>
-                                    <Input
-                                      value={lesson.title}
-                                      className="border-none p-0 h-auto font-medium"
-                                      onChange={(e) => {
-                                        setSections(sections.map(s => 
-                                          s.id === section.id 
-                                            ? { 
-                                                ...s, 
-                                                lessons: s.lessons.map(l => 
-                                                  l.id === lesson.id ? { ...l, title: e.target.value } : l
-                                                )
-                                              }
-                                            : s
-                                        ));
-                                      }}
-                                    />
-                                  </div>
-                                  <div className="flex items-center space-x-2">
-                                    <Select value={lesson.type} onValueChange={(value: any) => {
-                                      setSections(sections.map(s => 
-                                        s.id === section.id 
-                                          ? { 
-                                              ...s, 
-                                              lessons: s.lessons.map(l => 
-                                                l.id === lesson.id ? { ...l, type: value } : l
-                                              )
-                                            }
-                                          : s
-                                      ));
-                                    }}>
-                                      <SelectTrigger className="w-32">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="video">Video</SelectItem>
-                                        <SelectItem value="text">Text</SelectItem>
-                                        <SelectItem value="quiz">Quiz</SelectItem>
-                                        <SelectItem value="assignment">Assignment</SelectItem>
-                                        <SelectItem value="simulation">Simulation</SelectItem>
-                                        <SelectItem value="live">Live Session</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                    <Button variant="ghost" size="sm">
-                                      <Settings className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="sm">
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </CardContent>
+                        {!section.isCollapsed && (
+                          <CardContent>
+                            {section.lessons.length === 0 ? (
+                              <p className="text-sm text-muted-foreground">No lessons in this section yet.</p>
+                            ) : (
+                              <div className="space-y-4">
+                                {section.lessons.map((lesson) => (
+                                  <LessonEditor
+                                    key={lesson.id}
+                                    lesson={lesson}
+                                    onUpdate={(updatedLesson) => handleUpdateLesson(section.id, updatedLesson)}
+                                    onDelete={() => handleDeleteLesson(section.id, lesson.id)}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </CardContent>
+                        )}
                       </Card>
                     ))}
                   </div>
@@ -553,11 +552,16 @@ export default function CreateCourse() {
                   <CardDescription>Upload PDFs, eBooks, and reference materials</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                    <Upload className="mx-auto h-8 w-8 text-gray-400" />
-                    <Button variant="outline" className="mt-2">
+                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+                    <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
+                    <Button 
+                      variant="outline" 
+                      className="mt-2"
+                      onClick={() => handleFileUpload('documents')}
+                      disabled={isUploading}
+                    >
                       <FileText className="h-4 w-4 mr-2" />
-                      Upload Documents
+                      {isUploading ? 'Uploading...' : 'Upload Documents'}
                     </Button>
                     <p className="text-sm text-muted-foreground mt-2">PDF, EPUB, DOCX</p>
                   </div>
@@ -574,21 +578,18 @@ export default function CreateCourse() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                      <Upload className="mx-auto h-8 w-8 text-gray-400" />
-                      <Button variant="outline" className="mt-2">
+                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+                      <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
+                      <Button 
+                        variant="outline" 
+                        className="mt-2"
+                        onClick={() => handleFileUpload('videos')}
+                        disabled={isUploading}
+                      >
                         <Video className="h-4 w-4 mr-2" />
-                        Upload Videos
+                        {isUploading ? 'Uploading...' : 'Upload Videos'}
                       </Button>
                       <p className="text-sm text-muted-foreground mt-2">MP4, AVI, MOV</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm text-muted-foreground">Or</p>
-                      <Input placeholder="YouTube/Vimeo URL" className="mt-2" />
-                      <Button variant="outline" className="mt-2 w-full">
-                        <Link className="h-4 w-4 mr-2" />
-                        Add Video Link
-                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -597,17 +598,22 @@ export default function CreateCourse() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center">
-                    <FileCode className="h-5 w-5 mr-2" />
+                    <Terminal className="h-5 w-5 mr-2" />
                     Code & Projects
                   </CardTitle>
                   <CardDescription>Share code examples and project files</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                    <Upload className="mx-auto h-8 w-8 text-gray-400" />
-                    <Button variant="outline" className="mt-2">
-                      <FileCode className="h-4 w-4 mr-2" />
-                      Upload Code Files
+                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+                    <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
+                    <Button 
+                      variant="outline" 
+                      className="mt-2"
+                      onClick={() => handleFileUpload('code')}
+                      disabled={isUploading}
+                    >
+                      <Terminal className="h-4 w-4 mr-2" />
+                      {isUploading ? 'Uploading...' : 'Upload Code Files'}
                     </Button>
                     <p className="text-sm text-muted-foreground mt-2">ZIP, GitHub links</p>
                   </div>
@@ -623,11 +629,16 @@ export default function CreateCourse() {
                   <CardDescription>Provide datasets and additional assets</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                    <Upload className="mx-auto h-8 w-8 text-gray-400" />
-                    <Button variant="outline" className="mt-2">
+                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+                    <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
+                    <Button 
+                      variant="outline" 
+                      className="mt-2"
+                      onClick={() => handleFileUpload('assets')}
+                      disabled={isUploading}
+                    >
                       <Database className="h-4 w-4 mr-2" />
-                      Upload Assets
+                      {isUploading ? 'Uploading...' : 'Upload Assets'}
                     </Button>
                     <p className="text-sm text-muted-foreground mt-2">CSV, JSON, Images</p>
                   </div>
@@ -643,23 +654,33 @@ export default function CreateCourse() {
               <CardContent>
                 <div className="space-y-4">
                   <div className="grid grid-cols-3 gap-4">
-                    <Input placeholder="Link title" />
-                    <Input placeholder="URL" />
-                    <Button variant="outline">
+                    <Input 
+                      placeholder="Link title" 
+                      value={newLinkTitle}
+                      onChange={(e) => setNewLinkTitle(e.target.value)}
+                    />
+                    <Input 
+                      placeholder="URL" 
+                      value={newLinkUrl}
+                      onChange={(e) => setNewLinkUrl(e.target.value)}
+                    />
+                    <Button variant="outline" onClick={handleAddExternalLink}>
                       <Plus className="h-4 w-4 mr-2" />
                       Add Link
                     </Button>
                   </div>
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between p-3 border rounded">
-                      <div>
-                        <div className="font-medium">Arduino Official Documentation</div>
-                        <div className="text-sm text-muted-foreground">https://docs.arduino.cc/</div>
+                    {externalLinks.map((link) => (
+                      <div key={link.id} className="flex items-center justify-between p-3 border rounded">
+                        <div>
+                          <div className="font-medium">{link.title}</div>
+                          <div className="text-sm text-muted-foreground">{link.url}</div>
+                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => handleDeleteExternalLink(link.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <Button variant="ghost" size="sm">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    ))}
                   </div>
                 </div>
               </CardContent>
@@ -671,143 +692,107 @@ export default function CreateCourse() {
         return (
           <div className="space-y-6">
             <div>
-              <h2 className="text-2xl font-bold mb-4">Interactive Classroom Tools</h2>
-              <p className="text-muted-foreground">Configure tools for live sessions and collaborative learning.</p>
+              <h2 className="text-2xl font-bold mb-4">Interactive Simulators</h2>
+              <p className="text-muted-foreground">Enable interactive learning tools for your course.</p>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
-              {classroomTools.map((tool) => (
-                <Card key={tool.id} className={`transition-all ${enabledTools.includes(tool.id) ? 'ring-2 ring-primary' : ''}`}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <tool.icon className="h-6 w-6" />
-                        <div>
-                          <CardTitle className="text-lg">{tool.name}</CardTitle>
-                          <CardDescription>{tool.description}</CardDescription>
-                        </div>
-                      </div>
-                      <Switch
-                        checked={enabledTools.includes(tool.id)}
-                        onCheckedChange={() => handleToolToggle(tool.id)}
-                      />
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center space-x-3">
+                    <CircuitBoard className="h-6 w-6" />
+                    <div>
+                      <CardTitle>Circuit Simulator</CardTitle>
+                      <CardDescription>Interactive circuit design and simulation</CardDescription>
                     </div>
-                  </CardHeader>
-                  {enabledTools.includes(tool.id) && (
-                    <CardContent>
-                      <div className="space-y-3">
-                        {tool.type === 'simulation' && (
-                          <div>
-                            <Label>Simulation Settings</Label>
-                            <div className="grid grid-cols-2 gap-2 mt-2">
-                              <div className="flex items-center space-x-2">
-                                <Switch defaultChecked />
-                                <Label className="text-sm">Student Access</Label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <Switch defaultChecked />
-                                <Label className="text-sm">Real-time Sync</Label>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        {tool.type === 'breakout' && (
-                          <div>
-                            <Label>Team Configuration</Label>
-                            <div className="grid grid-cols-2 gap-2 mt-2">
-                              <Input placeholder="Max team size" type="number" defaultValue="4" />
-                              <Select defaultValue="auto">
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="auto">Auto-assign</SelectItem>
-                                  <SelectItem value="manual">Manual selection</SelectItem>
-                                  <SelectItem value="random">Random groups</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                        )}
-                        {tool.type === 'screen_share' && (
-                          <div>
-                            <Label>Sharing Options</Label>
-                            <div className="space-y-2 mt-2">
-                              <div className="flex items-center space-x-2">
-                                <Switch defaultChecked />
-                                <Label className="text-sm">Allow student screen sharing</Label>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <Switch defaultChecked />
-                                <Label className="text-sm">Record sessions</Label>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  )}
-                </Card>
-              ))}
-            </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <Switch defaultChecked />
+                      <Label>Enable for students</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch defaultChecked />
+                      <Label>Real-time collaboration</Label>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <Calendar className="h-5 w-5 mr-2" />
-                  Live Session Settings
-                </CardTitle>
-                <CardDescription>Configure your live classroom sessions</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <Label>Default Session Duration</Label>
-                    <Select defaultValue="60">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="30">30 minutes</SelectItem>
-                        <SelectItem value="60">1 hour</SelectItem>
-                        <SelectItem value="90">1.5 hours</SelectItem>
-                        <SelectItem value="120">2 hours</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Max Participants</Label>
-                    <Input type="number" placeholder="50" defaultValue="50" />
-                  </div>
-                  <div>
-                    <Label>Recording Settings</Label>
-                    <div className="space-y-2 mt-2">
-                      <div className="flex items-center space-x-2">
-                        <Switch defaultChecked />
-                        <Label className="text-sm">Auto-record sessions</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch />
-                        <Label className="text-sm">Allow downloads</Label>
-                      </div>
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center space-x-3">
+                    <Terminal className="h-6 w-6" />
+                    <div>
+                      <CardTitle>Arduino Playground</CardTitle>
+                      <CardDescription>Microcontroller programming environment</CardDescription>
                     </div>
                   </div>
-                  <div>
-                    <Label>Chat & Communication</Label>
-                    <div className="space-y-2 mt-2">
-                      <div className="flex items-center space-x-2">
-                        <Switch defaultChecked />
-                        <Label className="text-sm">Enable chat</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch defaultChecked />
-                        <Label className="text-sm">Private messaging</Label>
-                      </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <Switch defaultChecked />
+                      <Label>Enable for students</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch defaultChecked />
+                      <Label>Code sharing</Label>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center space-x-3">
+                    <Cog className="h-6 w-6" />
+                    <div>
+                      <CardTitle>ROS Environment</CardTitle>
+                      <CardDescription>Robot Operating System playground</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <Switch defaultChecked />
+                      <Label>Enable for students</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch />
+                      <Label>Advanced features</Label>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center space-x-3">
+                    <Monitor className="h-6 w-6" />
+                    <div>
+                      <CardTitle>2D Robot Simulator</CardTitle>
+                      <CardDescription>2D robot navigation and control</CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <Switch defaultChecked />
+                      <Label>Enable for students</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch defaultChecked />
+                      <Label>Multi-language support</Label>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         );
 
@@ -886,23 +871,6 @@ export default function CreateCourse() {
                       onCheckedChange={(checked) => setCourseData({ ...courseData, enableCertificate: checked })}
                     />
                   </div>
-                  <div>
-                    <Label>Completion Requirements</Label>
-                    <div className="space-y-2 mt-2">
-                      <div className="flex items-center space-x-2">
-                        <Switch defaultChecked />
-                        <Label className="text-sm">Complete all lessons</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch defaultChecked />
-                        <Label className="text-sm">Pass all quizzes (70%)</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch />
-                        <Label className="text-sm">Submit final project</Label>
-                      </div>
-                    </div>
-                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -910,43 +878,45 @@ export default function CreateCourse() {
             <Card>
               <CardHeader>
                 <CardTitle>Course Summary</CardTitle>
-                <CardDescription>Review your course before publishing</CardDescription>
+                <CardDescription>Review your course details before publishing</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <h4 className="font-semibold mb-2">Course Details</h4>
-                    <div className="space-y-1 text-sm">
-                      <div><span className="font-medium">Title:</span> {courseData.title || 'Untitled Course'}</div>
-                      <div><span className="font-medium">Category:</span> {courseData.category || 'Not selected'}</div>
-                      <div><span className="font-medium">Difficulty:</span> {courseData.difficulty || 'Not selected'}</div>
-                      <div><span className="font-medium">Price:</span> ${courseData.price || '0'}</div>
-                      <div><span className="font-medium">Duration:</span> {courseData.duration || '0'} hours</div>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Course Title</Label>
+                      <p className="font-medium">{courseData.title || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <Label>Category</Label>
+                      <p className="font-medium">{courseData.category || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <Label>Difficulty</Label>
+                      <p className="font-medium">{courseData.difficulty || 'Not set'}</p>
+                    </div>
+                    <div>
+                      <Label>Price</Label>
+                      <p className="font-medium">${courseData.price || '0'}</p>
                     </div>
                   </div>
                   <div>
-                    <h4 className="font-semibold mb-2">Content Structure</h4>
-                    <div className="space-y-1 text-sm">
-                      <div><span className="font-medium">Sections:</span> {sections.length}</div>
-                      <div><span className="font-medium">Lessons:</span> {sections.reduce((total, section) => total + section.lessons.length, 0)}</div>
-                      <div><span className="font-medium">Interactive Tools:</span> {enabledTools.length}</div>
-                      <div><span className="font-medium">Tags:</span> {courseData.tags.join(', ') || 'None'}</div>
+                    <Label>Sections & Lessons</Label>
+                    <p className="font-medium">
+                      {sections.length} sections, {sections.reduce((total, section) => total + section.lessons.length, 0)} lessons
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Tags</Label>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {courseData.tags.map((tag) => (
+                        <Badge key={tag} variant="secondary">{tag}</Badge>
+                      ))}
                     </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
-
-            <div className="flex space-x-4">
-              <Button className="flex-1" size="lg">
-                <Save className="h-4 w-4 mr-2" />
-                Save as Draft
-              </Button>
-              <Button className="flex-1" size="lg" variant="default">
-                <Send className="h-4 w-4 mr-2" />
-                Publish Course
-              </Button>
-            </div>
           </div>
         );
 
@@ -957,56 +927,53 @@ export default function CreateCourse() {
 
   return (
     <Layout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Plus className="h-8 w-8" />
-              Create New Course
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              Build an engaging robotics course with interactive tools and comprehensive content
-            </p>
-          </div>
-          <Badge variant="outline" className="text-sm">
-            Step {currentStep} of {totalSteps}
-          </Badge>
+      <div className="max-w-6xl mx-auto p-6">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Create New Course</h1>
+          <p className="text-muted-foreground">Build an engaging robotics course with interactive lessons and simulations.</p>
         </div>
 
         {/* Progress Bar */}
-        <div>
-          <div className="flex justify-between text-sm text-muted-foreground mb-2">
-            <span>Course Creation Progress</span>
-            <span>{Math.round(progressPercentage)}% Complete</span>
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium">Step {currentStep} of {totalSteps}</span>
+            <span className="text-sm text-muted-foreground">{Math.round(progressPercentage)}% complete</span>
           </div>
           <Progress value={progressPercentage} className="h-2" />
         </div>
 
         {/* Step Content */}
-        <Card>
-          <CardContent className="p-8">
-            {renderStepContent()}
-          </CardContent>
-        </Card>
+        <div className="mb-8">
+          {renderStepContent()}
+        </div>
 
         {/* Navigation */}
-        <div className="flex justify-between">
-          <Button 
-            variant="outline" 
-            onClick={handlePrevious} 
+        <div className="flex items-center justify-between">
+          <Button
+            variant="outline"
+            onClick={handlePrevious}
             disabled={currentStep === 1}
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
             Previous
           </Button>
-          <Button 
-            onClick={handleNext} 
-            disabled={currentStep === totalSteps}
-          >
-            {currentStep === totalSteps ? 'Complete' : 'Next'}
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
+          
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleSaveDraft}>
+              <Save className="h-4 w-4 mr-2" />
+              Save Draft
+            </Button>
+            
+            {currentStep === totalSteps ? (
+              <Button onClick={handlePublishCourse}>
+                <Send className="h-4 w-4 mr-2" />
+                Publish Course
+              </Button>
+            ) : (
+              <Button onClick={handleNext}>
+                Next
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </Layout>
