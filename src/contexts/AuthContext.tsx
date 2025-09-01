@@ -1,23 +1,29 @@
-// src/contexts/AuthContext.tsx
-// Complete authentication context with all features
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { User, Session } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, UserRole } from '@/types/user';
+export type UserRole = 'student' | 'teacher' | 'admin';
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  avatar_url?: string;
+  created_at: string;
+  updated_at: string;
+}
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
-  register: (name: string, email: string, password: string, role: UserRole) => Promise<{ requiresVerification: boolean; email: string }>;
-  verifyOTP: (email: string, otpCode: string, purpose: string) => Promise<void>;
-  resendOTP: (email: string, purpose: string) => Promise<void>;
-  forgotPassword: (email: string) => Promise<void>;
-  resetPassword: (email: string, otpCode: string, newPassword: string, confirmPassword: string) => Promise<void>;
-  changePassword: (currentPassword: string, newPassword: string, confirmPassword: string) => Promise<void>;
-  requestEmailChange: (newEmail: string) => Promise<{ newEmail: string }>;
-  verifyEmailChange: (newEmail: string, otpCode: string) => Promise<void>;
-  deleteAccount: (password: string, confirmation: string) => Promise<void>;
+  profile: UserProfile | null;
+  session: Session | null;
   isLoading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string, role: UserRole) => Promise<void>;
+  logout: () => Promise<void>;
+  updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,323 +36,189 @@ export const useAuth = () => {
   return context;
 };
 
-// API Configuration
-const API_BASE_URL = 'http://127.0.0.1:8000/api';
+interface AuthProviderProps {
+  children: ReactNode;
+}
 
-// Enhanced API Helper Functions
-const apiCall = async (endpoint: string, options: RequestInit = {}) => {
-  const token = localStorage.getItem('accessToken');
-  
-  const config: RequestInit = {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...options.headers,
-    },
-    ...options,
-  };
-
-  try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-    const data = await response.json();
-
-    if (!response.ok) {
-      // Extract the most specific error message
-      let errorMessage = 'Request failed';
-      
-      if (data.error) {
-        errorMessage = data.error;
-      } else if (data.message) {
-        errorMessage = data.message;
-      } else if (data.detail) {
-        errorMessage = data.detail;
-      } else if (data.non_field_errors) {
-        errorMessage = Array.isArray(data.non_field_errors) 
-          ? data.non_field_errors.join(', ')
-          : data.non_field_errors;
-      } else if (typeof data === 'string') {
-        errorMessage = data;
-      } else if (data.email && Array.isArray(data.email)) {
-        errorMessage = `Email: ${data.email.join(', ')}`;
-      } else if (data.password && Array.isArray(data.password)) {
-        errorMessage = `Password: ${data.password.join(', ')}`;
-      }
-      
-      console.error('API Error:', {
-        status: response.status,
-        statusText: response.statusText,
-        data: data,
-        endpoint: endpoint
-      });
-      
-      throw new Error(errorMessage);
-    }
-
-    return data;
-  } catch (error) {
-    if (error instanceof TypeError && error.message.includes('fetch')) {
-      throw new Error('Cannot connect to server. Make sure the backend is running on http://127.0.0.1:8000');
-    }
-    throw error;
-  }
-};
-
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    // Check for existing auth token on mount
-    const token = localStorage.getItem('accessToken');
-    const userData = localStorage.getItem('userData');
-    
-    if (token && userData) {
-      try {
-        const parsedUser = JSON.parse(userData);
-        setUser(parsedUser);
-        // Optionally verify token with backend
-        verifyToken();
-      } catch (error) {
-        console.error('Error parsing stored user data:', error);
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('userData');
+  const fetchProfile = async (userId: string): Promise<UserProfile | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error fetching profile:', error);
+        return null;
       }
+
+      return data as UserProfile;
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      return null;
     }
-    setIsLoading(false);
+  };
+
+  const login = async (email: string, password: string): Promise<void> => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data.user) {
+        const userProfile = await fetchProfile(data.user.id);
+        setProfile(userProfile);
+      }
+
+      toast.success('Successfully logged in!');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Login failed';
+      toast.error(message);
+      throw error;
+    }
+  };
+
+  const register = async (name: string, email: string, password: string, role: UserRole): Promise<void> => {
+    try {
+      const redirectUrl = `${window.location.origin}/`;
+      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            name,
+            role,
+          }
+        }
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data.user && !data.session) {
+        toast.success('Please check your email to confirm your account!');
+      } else if (data.session) {
+        toast.success('Account created successfully!');
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Registration failed';
+      toast.error(message);
+      throw error;
+    }
+  };
+
+  const logout = async (): Promise<void> => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+      toast.success('Successfully logged out!');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Logout failed';
+      toast.error(message);
+      throw error;
+    }
+  };
+
+  const updateProfile = async (updates: Partial<UserProfile>): Promise<void> => {
+    if (!user) {
+      throw new Error('No user logged in');
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', user.id)
+        .select()
+        .single();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      setProfile(data as UserProfile);
+      toast.success('Profile updated successfully!');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Profile update failed';
+      toast.error(message);
+      throw error;
+    }
+  };
+
+  useEffect(() => {
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        // Fetch profile when user logs in
+        if (session?.user) {
+          setTimeout(async () => {
+            const userProfile = await fetchProfile(session.user.id);
+            setProfile(userProfile);
+          }, 0);
+        } else {
+          setProfile(null);
+        }
+
+        setIsLoading(false);
+      }
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        setTimeout(async () => {
+          const userProfile = await fetchProfile(session.user.id);
+          setProfile(userProfile);
+          setIsLoading(false);
+        }, 0);
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const verifyToken = async () => {
-    try {
-      const response = await apiCall('/auth/profile/');
-      setUser(response);
-      localStorage.setItem('userData', JSON.stringify(response));
-    } catch (error) {
-      // Token is invalid, clear storage
-      console.error('Token verification failed:', error);
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('userData');
-      setUser(null);
-    }
-  };
-
-  const login = async (email: string, password: string) => {
-    setIsLoading(true);
-    try {
-      const response = await apiCall('/auth/login/', {
-        method: 'POST',
-        body: JSON.stringify({ email, password }),
-      });
-
-      // Store tokens and user data
-      localStorage.setItem('accessToken', response.tokens.access);
-      localStorage.setItem('refreshToken', response.tokens.refresh);
-      localStorage.setItem('userData', JSON.stringify(response.user));
-      
-      setUser(response.user);
-    } catch (error) {
-      throw error; // Re-throw with preserved error message
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const register = async (name: string, email: string, password: string, role: UserRole) => {
-    setIsLoading(true);
-    try {
-      const response = await apiCall('/auth/register/', {
-        method: 'POST',
-        body: JSON.stringify({ 
-          name, 
-          email, 
-          password, 
-          password_confirm: password,
-          role 
-        }),
-      });
-
-      return {
-        requiresVerification: response.requires_verification || true,
-        email: response.email
-      };
-    } catch (error) {
-      throw error; // Re-throw with preserved error message
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const verifyOTP = async (email: string, otpCode: string, purpose: string) => {
-    setIsLoading(true);
-    try {
-      const response = await apiCall('/auth/verify-otp/', {
-        method: 'POST',
-        body: JSON.stringify({ 
-          email, 
-          otp_code: otpCode, 
-          purpose 
-        }),
-      });
-
-      // If verification is successful and includes tokens (for registration)
-      if (response.tokens) {
-        localStorage.setItem('accessToken', response.tokens.access);
-        localStorage.setItem('refreshToken', response.tokens.refresh);
-        localStorage.setItem('userData', JSON.stringify(response.user));
-        setUser(response.user);
-      }
-
-      return response;
-    } catch (error) {
-      throw error; // Re-throw with preserved error message
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const resendOTP = async (email: string, purpose: string) => {
-    try {
-      await apiCall('/auth/resend-otp/', {
-        method: 'POST',
-        body: JSON.stringify({ email, purpose }),
-      });
-    } catch (error) {
-      throw error; // Re-throw with preserved error message
-    }
-  };
-
-  const forgotPassword = async (email: string) => {
-    try {
-      await apiCall('/auth/forgot-password/', {
-        method: 'POST',
-        body: JSON.stringify({ email }),
-      });
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  const resetPassword = async (email: string, otpCode: string, newPassword: string, confirmPassword: string) => {
-    try {
-      await apiCall('/auth/reset-password/', {
-        method: 'POST',
-        body: JSON.stringify({ 
-          email, 
-          otp_code: otpCode, 
-          purpose: 'password_reset',
-          new_password: newPassword,
-          confirm_password: confirmPassword
-        }),
-      });
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  const changePassword = async (currentPassword: string, newPassword: string, confirmPassword: string) => {
-    try {
-      await apiCall('/auth/change-password/', {
-        method: 'POST',
-        body: JSON.stringify({ 
-          current_password: currentPassword,
-          new_password: newPassword,
-          confirm_password: confirmPassword
-        }),
-      });
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  const requestEmailChange = async (newEmail: string) => {
-    try {
-      const response = await apiCall('/auth/request-email-change/', {
-        method: 'POST',
-        body: JSON.stringify({ new_email: newEmail }),
-      });
-      return { newEmail: response.new_email };
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  const verifyEmailChange = async (newEmail: string, otpCode: string) => {
-    try {
-      const response = await apiCall('/auth/verify-email-change/', {
-        method: 'POST',
-        body: JSON.stringify({ 
-          new_email: newEmail,
-          otp_code: otpCode
-        }),
-      });
-      
-      // Update user data with new email
-      if (response.user) {
-        localStorage.setItem('userData', JSON.stringify(response.user));
-        setUser(response.user);
-      }
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  const deleteAccount = async (password: string, confirmation: string) => {
-    try {
-      await apiCall('/auth/delete-account/', {
-        method: 'DELETE',
-        body: JSON.stringify({ 
-          password,
-          confirmation
-        }),
-      });
-      
-      // Clear all data after successful deletion
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('userData');
-      setUser(null);
-    } catch (error) {
-      throw error;
-    }
-  };
-
-  const logout = async () => {
-    try {
-      const refreshToken = localStorage.getItem('refreshToken');
-      if (refreshToken) {
-        await apiCall('/auth/logout/', {
-          method: 'POST',
-          body: JSON.stringify({ refresh_token: refreshToken }),
-        });
-      }
-    } catch (error) {
-      // Even if logout request fails, clear local storage
-      console.error('Logout request failed:', error);
-    } finally {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('userData');
-      setUser(null);
-    }
+  const value: AuthContextType = {
+    user,
+    profile,
+    session,
+    isLoading,
+    login,
+    register,
+    logout,
+    updateProfile,
   };
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      login,
-      logout,
-      register,
-      verifyOTP,
-      resendOTP,
-      forgotPassword,
-      resetPassword,
-      changePassword,
-      requestEmailChange,
-      verifyEmailChange,
-      deleteAccount,
-      isLoading
-    }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

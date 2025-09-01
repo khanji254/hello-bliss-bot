@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Layout } from "@/components/layout/Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatTextContent } from '@/utils/sanitize';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -294,7 +295,7 @@ This forms the foundation for more complex sensor interactions in robotics appli
       case 'text':
         return (
           <div className="prose max-w-none">
-            <div dangerouslySetInnerHTML={{ __html: currentLesson.content.text?.replace(/\n/g, '<br>') || '' }} />
+            <div dangerouslySetInnerHTML={{ __html: formatTextContent(currentLesson.content.text || '') }} />
           </div>
         );
 

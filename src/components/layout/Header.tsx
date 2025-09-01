@@ -12,7 +12,7 @@ interface HeaderProps {
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
-  const { user, logout } = useAuth();
+  const { user, profile, logout } = useAuth();
   const { theme, setTheme } = useTheme();
 
   const handleLogout = () => {
@@ -78,8 +78,8 @@ export function Header({ onMenuClick }: HeaderProps) {
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={user.avatar} alt={user.name} />
-                    <AvatarFallback>{user.name.charAt(0).toUpperCase()}</AvatarFallback>
+                    <AvatarImage src={profile?.avatar_url} alt={profile?.name} />
+                    <AvatarFallback>{profile?.name?.charAt(0).toUpperCase()}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>

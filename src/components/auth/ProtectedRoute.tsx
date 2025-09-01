@@ -11,7 +11,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-  const { user, isLoading } = useAuth();
+  const { user, profile, isLoading } = useAuth();
   const location = useLocation();
 
   // Show loading spinner while checking authentication
@@ -32,10 +32,10 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   }
 
   // If role-based access is specified, check user role
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
+  if (allowedRoles && profile && !allowedRoles.includes(profile.role)) {
     // Redirect to appropriate dashboard based on user role
-    const redirectPath = user.role === 'student' ? '/student' : 
-                        user.role === 'teacher' ? '/teacher' : 
+    const redirectPath = profile?.role === 'student' ? '/student' : 
+                        profile?.role === 'teacher' ? '/teacher' : 
                         '/auth';
     return <Navigate to={redirectPath} replace />;
   }
