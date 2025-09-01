@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Layout } from '@/components/layout/Layout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -428,29 +428,292 @@ export function RobotProgramming() {
       wifi: 'Connected'
     }
   });
+  // Pyodide and in-browser simulator refs
+  const pyodideRef = useRef<any>(null);
+  const simulatorRef = useRef<any>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const runPromiseRef = useRef<Promise<any> | null>(null);
 
-  // Simulate robot execution
-  const executeCode = () => {
-    setIsRunning(true);
-    setConsoleOutput(['Starting program execution...', 'Robot initialized successfully']);
-    
-    setTimeout(() => {
-      setConsoleOutput(prev => [...prev, 'Executing movement commands...']);
-    }, 1000);
-    
-    setTimeout(() => {
-      setConsoleOutput(prev => [...prev, 'Reading sensor data...', 'Distance: 156cm', 'Battery: 87%']);
-    }, 2000);
-    
-    setTimeout(() => {
-      setConsoleOutput(prev => [...prev, 'Program completed successfully!']);
-      setIsRunning(false);
-    }, 4000);
+  // Helper to push lines to the console output in UI
+  const pushConsole = useCallback((line: string) => {
+    setConsoleOutput(prev => [...prev, line]);
+  }, []);
+
+  // Simple JS in-browser simulator (kinematic, educational)
+  class SimpleSimulator {
+    position = { x: 0, y: 0, angle: 0 };
+    battery = 100;
+    distance = 200; // cm
+    motors = { left: 0, right: 0 };
+    led = 'off';
+    running = false;
+  canvas: HTMLCanvasElement | null = null;
+  rafHandle: number | null = null;
+
+    init() {
+      this.running = true;
+      pushConsole('Simulator: init() called');
+  this.startRendering();
+    }
+    move_forward({ speed = 0.3 } = {}) {
+      this.motors.left = speed;
+      this.motors.right = speed;
+      pushConsole(`Simulator: move_forward speed=${speed}`);
+    }
+    move_backward({ speed = 0.3 } = {}) {
+      this.motors.left = -speed;
+      this.motors.right = -speed;
+      pushConsole(`Simulator: move_backward speed=${speed}`);
+    }
+    stop() {
+      this.motors.left = 0;
+      this.motors.right = 0;
+      pushConsole('Simulator: stop()');
+    }
+    turn_left(deg = 90) {
+      this.position.angle = (this.position.angle - deg + 360) % 360;
+      pushConsole(`Simulator: turn_left ${deg}°`);
+    }
+    turn_right(deg = 90) {
+      this.position.angle = (this.position.angle + deg) % 360;
+      pushConsole(`Simulator: turn_right ${deg}°`);
+    }
+    set_motor_speeds(left = 0, right = 0) {
+      this.motors.left = left;
+      this.motors.right = right;
+      pushConsole(`Simulator: set_motor_speeds L=${left} R=${right}`);
+    }
+    get_distance() {
+      // Return a simple function of position for demo
+      const d = Math.max(5, Math.round(this.distance - (this.position.x + this.position.y)));
+      pushConsole(`Simulator: get_distance -> ${d}`);
+      return d;
+    }
+    get_battery_level() {
+      this.battery = Math.max(0, this.battery - 0.01);
+      return Math.round(this.battery);
+    }
+    get_position() {
+      return [this.position.x, this.position.y, this.position.angle];
+    }
+    set_led_color(color = 'off') {
+      this.led = color;
+      pushConsole(`Simulator: LED set to ${color}`);
+    }
+    cleanup() {
+      this.running = false;
+      pushConsole('Simulator: cleanup()');
+      this.stopRendering();
+    }
+
+    startRendering() {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      this.canvas = canvas;
+      const ctx = canvas.getContext('2d');
+      const render = () => {
+        if (!ctx || !this.running) return;
+        const w = canvas.width;
+        const h = canvas.height;
+        // clear
+        ctx.fillStyle = '#111827';
+        ctx.fillRect(0, 0, w, h);
+
+        // draw a simple line (white) across the middle for line-following demo
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.moveTo(0, h/2);
+        ctx.lineTo(w, h/2);
+        ctx.stroke();
+
+        // draw robot as a circle
+        const rx = (w/2) + this.position.x % (w/4);
+        const ry = h/2 + this.position.y % (h/6);
+        ctx.fillStyle = '#22c55e';
+        ctx.beginPath();
+        ctx.arc(rx, ry, 12, 0, Math.PI*2);
+        ctx.fill();
+
+        // sensor text
+        ctx.fillStyle = '#d1d5db';
+        ctx.font = '12px monospace';
+        ctx.fillText(`Dist: ${this.get_distance()}cm`, 6, 14);
+        ctx.fillText(`Battery: ${this.get_battery_level()}%`, 6, 30);
+
+        // update some position to simulate movement
+        this.position.x += (this.motors.left + this.motors.right) * 0.5;
+        this.position.y += (this.motors.left - this.motors.right) * 0.25;
+
+        this.rafHandle = requestAnimationFrame(render);
+      };
+      this.rafHandle = requestAnimationFrame(render);
+    }
+
+    stopRendering() {
+      if (this.rafHandle) {
+        cancelAnimationFrame(this.rafHandle);
+        this.rafHandle = null;
+      }
+    }
+
+    captureCameraFrame() {
+      const canvas = this.canvas || canvasRef.current;
+      if (!canvas) return null;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      const w = canvas.width;
+      const h = canvas.height;
+      const imageData = ctx.getImageData(0, 0, w, h);
+      // Return plain object with pixel data (Uint8ClampedArray)
+      return { width: w, height: h, data: imageData.data };
+    }
+  }
+
+  // Load Pyodide lazily and register robot_api & output bridge
+  const ensurePyodide = async () => {
+    if (pyodideRef.current) return pyodideRef.current;
+    pushConsole('Loading Pyodide... (this may take a few seconds)');
+    // Load the Pyodide script
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore
+    if (!window.loadPyodide) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/pyodide/v0.23.4/full/pyodide.js';
+        s.onload = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+
+    // @ts-ignore
+    const pyodide = await window.loadPyodide({ indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.23.4/full/' });
+    // load numpy for basic numeric needs
+    try {
+      await pyodide.loadPackage(['micropip', 'numpy']);
+    } catch (e) {
+      // non-fatal
+      console.warn('Pyodide package load failed', e);
+    }
+
+    // create simulator instance
+    simulatorRef.current = new SimpleSimulator();
+
+    // Expose console bridge
+    const outputBridge = {
+      write: (s: any) => {
+        // pyodide may call with non-strings
+        pushConsole(String(s));
+      }
+    };
+
+    // Expose robot_api JS module to Python
+    const jsRobotApi = {
+      init: () => simulatorRef.current?.init(),
+      move_forward: (opts: any) => simulatorRef.current?.move_forward(opts),
+      move_backward: (opts: any) => simulatorRef.current?.move_backward(opts),
+      stop: () => simulatorRef.current?.stop(),
+      turn_left: (deg: number) => simulatorRef.current?.turn_left(deg),
+      turn_right: (deg: number) => simulatorRef.current?.turn_right(deg),
+      set_motor_speeds: (left: number, right: number) => simulatorRef.current?.set_motor_speeds(left, right),
+      get_distance: () => simulatorRef.current?.get_distance(),
+      get_camera_frame: () => {
+        // return camera frame object; Python helper will attempt to convert
+        return simulatorRef.current?.captureCameraFrame();
+      },
+      get_battery_level: () => simulatorRef.current?.get_battery_level(),
+      get_position: () => simulatorRef.current?.get_position(),
+      set_led_color: (c: string) => simulatorRef.current?.set_led_color(c),
+      cleanup: () => simulatorRef.current?.cleanup()
+    };
+
+    // Register JS modules so Python can `import robot_api` and `import bliss_output`
+    // @ts-ignore
+    pyodide.registerJsModule('robot_api', jsRobotApi);
+    // @ts-ignore
+    pyodide.registerJsModule('bliss_output', outputBridge);
+
+    pyodideRef.current = pyodide;
+    pushConsole('Pyodide loaded.');
+    return pyodide;
   };
 
+  // Run user code using Pyodide. Best-effort: supports print() and the JS-registered robot_api functions.
+  const executeCode = async () => {
+    setIsRunning(true);
+    setConsoleOutput([]);
+    try {
+      const pyodide = await ensurePyodide();
+
+      // Prepare Python-side stdout/stderr bridge to our outputBridge
+    const setupStdout = `
+import sys
+import bliss_output
+class StdOut:
+    def write(self, s):
+        try:
+            bliss_output.write(s)
+        except Exception as e:
+            pass
+    def flush(self):
+        pass
+sys.stdout = StdOut()
+sys.stderr = StdOut()
+# Helper to convert camera JS object (returned from robot_api.get_camera_frame()) into a numpy array
+try:
+  import js
+  import numpy as _np
+  def _get_camera_numpy(cam):
+    try:
+      # 'cam' is a JsProxy with fields 'width','height','data' (Uint8ClampedArray)
+      buf = js.Uint8ClampedArray.new(cam['data']).to_py()
+      arr = _np.frombuffer(buf, dtype=_np.uint8)
+      arr = arr.reshape((cam['height'], cam['width'], 4))
+      return arr[:, :, :3].copy()
+    except Exception as e:
+      print('camera conversion failed:', e)
+      return None
+except Exception:
+  pass
+`;
+
+      await pyodide.runPythonAsync(setupStdout);
+
+      // Ensure simulator reset for each run
+      simulatorRef.current = new SimpleSimulator();
+
+      // Run the user's code
+      const userCode = code;
+      pushConsole('Starting program execution (Pyodide)...');
+      const runPromise = pyodide.runPythonAsync(userCode);
+      runPromiseRef.current = runPromise;
+
+      await runPromise;
+      pushConsole('Program completed successfully (Pyodide).');
+    } catch (err: any) {
+      pushConsole(`Error during execution: ${err?.toString()}`);
+    } finally {
+      setIsRunning(false);
+      runPromiseRef.current = null;
+    }
+  };
+
+  // Best-effort stop: signal and update UI. Pyodide cannot always be interrupted cleanly.
   const stopExecution = () => {
+    pushConsole('Stop requested. Attempting to terminate execution...');
     setIsRunning(false);
-    setConsoleOutput(prev => [...prev, 'Program stopped by user']);
+    // Try to throw KeyboardInterrupt in the running Pyodide coroutine
+    const py = pyodideRef.current;
+    if (py) {
+      try {
+        // This may raise inside pyodide but may not cancel blocking calls
+        // @ts-ignore
+        py.runPythonAsync("raise KeyboardInterrupt('Stopped by user')").catch(() => {});
+      } catch (e) {
+        // ignore
+      }
+    }
   };
 
   return (

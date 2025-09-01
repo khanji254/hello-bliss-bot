@@ -208,20 +208,73 @@ export const teacherApi = {
     return await apiCall('/courses/teacher/courses/');
   },
 
-  // Create new course
+  // Create new course with file upload support
   createCourse: async (courseData: any) => {
-    return await apiCall('/courses/teacher/courses/', {
-      method: 'POST',
-      body: JSON.stringify(courseData),
-    });
+    // Check if there's a thumbnail file to upload
+    if (courseData.thumbnail instanceof File) {
+      const formData = new FormData();
+      
+      // Add all course data to FormData
+      Object.keys(courseData).forEach(key => {
+        if (key === 'tags' || key === 'learning_objectives' || key === 'prerequisites') {
+          // Send arrays as JSON strings
+          formData.append(key, JSON.stringify(courseData[key]));
+        } else if (courseData[key] !== null && courseData[key] !== undefined) {
+          formData.append(key, courseData[key]);
+        }
+      });
+      
+      return await apiFileUpload('/courses/teacher/courses/', formData);
+    } else {
+      // No file upload, use regular JSON
+      return await apiCall('/courses/teacher/courses/', {
+        method: 'POST',
+        body: JSON.stringify(courseData),
+      });
+    }
   },
 
-  // Update course
+  // Update course with file upload support
   updateCourse: async (courseId: string, courseData: any) => {
-    return await apiCall(`/courses/teacher/courses/${courseId}/`, {
-      method: 'PUT',
-      body: JSON.stringify(courseData),
-    });
+    // Check if there's a thumbnail file to upload
+    if (courseData.thumbnail instanceof File) {
+      const formData = new FormData();
+      
+      // Add all course data to FormData
+      Object.keys(courseData).forEach(key => {
+        if (key === 'tags' || key === 'learning_objectives' || key === 'prerequisites') {
+          // Send arrays as JSON strings
+          formData.append(key, JSON.stringify(courseData[key]));
+        } else if (courseData[key] !== null && courseData[key] !== undefined) {
+          formData.append(key, courseData[key]);
+        }
+      });
+      
+      const token = localStorage.getItem('accessToken');
+      
+      const config: RequestInit = {
+        method: 'PUT',
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: formData,
+      };
+
+      const response = await fetch(`${API_BASE_URL}/courses/teacher/courses/${courseId}/`, config);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Update failed');
+      }
+
+      return data;
+    } else {
+      // No file upload, use regular JSON
+      return await apiCall(`/courses/teacher/courses/${courseId}/`, {
+        method: 'PUT',
+        body: JSON.stringify(courseData),
+      });
+    }
   },
 
   // Delete course

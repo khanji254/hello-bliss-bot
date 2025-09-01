@@ -36,6 +36,58 @@ npm i
 npm run dev
 ```
 
+## Local Setup Instructions
+
+This project has two main parts:
+
+- **Frontend**: `hello-bliss-bot` (React, Vite, TypeScript)
+- **Backend**: `Hello-Bliss-Bot-Backend-DRF` (Django REST Framework)
+
+### Frontend Setup (hello-bliss-bot)
+
+```sh
+# Open a terminal and navigate to the frontend folder
+cd hello-bliss-bot
+
+# Install dependencies
+npm install
+
+# Start the development server
+npm run dev
+# The app will be available at http://localhost:8080/
+```
+
+### Backend Setup (Hello-Bliss-Bot-Backend-DRF)
+
+```powershell
+# Open PowerShell and navigate to the backend folder
+cd Hello-Bliss-Bot-Backend-DRF
+
+# Create a virtual environment (first time only)
+python -m venv venv-windows
+
+# Activate the virtual environment
+.\venv-windows\Scripts\Activate.ps1
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run migrations
+python manage.py migrate
+
+# Start the Django development server
+python manage.py runserver 127.0.0.1:8000
+# The API will be available at http://127.0.0.1:8000/
+```
+
+### Common Issues
+
+- If you see `npm error code ENOENT`, make sure you are in the `hello-bliss-bot` folder when running npm commands.
+- For PowerShell venv activation, use `Activate.ps1` (not `Activate.psi`).
+- If you see `No module named 'django'`, ensure your venv is activated and dependencies are installed.
+
+---
+
 **Edit a file directly in GitHub**
 
 - Navigate to the desired file(s).

@@ -13,6 +13,7 @@ import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { teacherApi } from "@/lib/api";
 import { 
   Plus,
   Upload,
@@ -281,11 +282,59 @@ export default function CreateCourse() {
     });
   };
 
-  const handlePublishCourse = () => {
-    toast({
-      title: "Course published!",
-      description: "Your course is now live and available to students."
-    });
+  const handlePublishCourse = async () => {
+    try {
+      setIsUploading(true);
+      
+      // Validate required fields
+      if (!courseData.title || !courseData.description || !courseData.category || !courseData.difficulty) {
+        toast({
+          title: "Validation Error",
+          description: "Please fill in all required fields before publishing.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Prepare course data for submission
+      const coursePayload = {
+        title: courseData.title,
+        description: courseData.description,
+        short_description: courseData.description.substring(0, 500), // Truncate for short description
+        category_id: parseInt(courseData.category), // Convert to number if needed
+        level: courseData.difficulty,
+        price: parseFloat(courseData.price) || 0,
+        duration: courseData.duration || "4 weeks",
+        thumbnail: courseData.thumbnail, // File object or null
+        tags: courseData.tags,
+        learning_objectives: [], // TODO: Add learning objectives from form
+        prerequisites: [], // TODO: Add prerequisites from form
+        status: 'published',
+        is_featured: false,
+        video_preview: "", // TODO: Add if you have video preview functionality
+      };
+
+      const response = await teacherApi.createCourse(coursePayload);
+      
+      toast({
+        title: "Course published!",
+        description: `"${courseData.title}" is now live and available to students.`
+      });
+
+      // Reset form or redirect
+      // You might want to redirect to the course management page
+      console.log('Course created:', response);
+      
+    } catch (error: any) {
+      console.error('Error creating course:', error);
+      toast({
+        title: "Failed to publish course",
+        description: error.message || "An unexpected error occurred. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const renderStepContent = () => {
@@ -964,9 +1013,9 @@ export default function CreateCourse() {
             </Button>
             
             {currentStep === totalSteps ? (
-              <Button onClick={handlePublishCourse}>
+              <Button onClick={handlePublishCourse} disabled={isUploading}>
                 <Send className="h-4 w-4 mr-2" />
-                Publish Course
+                {isUploading ? 'Publishing...' : 'Publish Course'}
               </Button>
             ) : (
               <Button onClick={handleNext}>
